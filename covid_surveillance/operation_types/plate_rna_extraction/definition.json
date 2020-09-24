@@ -1,0 +1,30 @@
+{
+  "id": 5,
+  "name": "Plate RNA Extraction",
+  "parent_class": "OperationType",
+  "category": "Covid Surveillance",
+  "inputs": [
+    {
+      "name": "Pooled Sample Plate",
+      "part": true,
+      "array": null,
+      "routing": "P"
+    },
+    {
+      "name": "Options",
+      "part": null,
+      "array": null,
+      "routing": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Pooled Sample Plate",
+      "part": true,
+      "array": null,
+      "routing": "P"
+    }
+  ],
+  "on_the_fly": null,
+  "user_id": 1
+}

@@ -1,0 +1,35 @@
+{
+  "id": 2,
+  "name": "Ingest Patient Sample",
+  "parent_class": "OperationType",
+  "category": "Covid Surveillance",
+  "inputs": [
+    {
+      "name": "Project",
+      "part": null,
+      "array": null,
+      "routing": null
+    },
+    {
+      "name": "Sample Type",
+      "part": null,
+      "array": null,
+      "routing": null
+    },
+    {
+      "name": "Object Type",
+      "part": null,
+      "array": null,
+      "routing": null
+    },
+    {
+      "name": "Options",
+      "part": null,
+      "array": null,
+      "routing": null
+    }
+  ],
+  "outputs": [],
+  "on_the_fly": null,
+  "user_id": 1
+}
