@@ -147,7 +147,7 @@ end
 
   def set_up_test(operations)
     operations.each do |op|
-      sample2 = op.input(POOLED_PLATE).item.sample
+      sample2 = op.input(POOLED_PLATE).part.sample
       plate2 = op.input(POOLED_PLATE).collection
       samples2 = Array.new(plate2.get_non_empty.length, sample2)
 

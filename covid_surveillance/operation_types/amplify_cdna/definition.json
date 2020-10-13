@@ -1,0 +1,36 @@
+{
+  "id": 9,
+  "name": "Amplify cDNA",
+  "parent_class": "OperationType",
+  "category": "Covid Surveillance",
+  "inputs": [
+    {
+      "name": "Pooled Sample Plate",
+      "part": true,
+      "array": false,
+      "routing": "P"
+    },
+    {
+      "name": "Options",
+      "part": false,
+      "array": false,
+      "routing": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "COV1",
+      "part": true,
+      "array": false,
+      "routing": "P1"
+    },
+    {
+      "name": "COV2",
+      "part": true,
+      "array": null,
+      "routing": "P2"
+    }
+  ],
+  "on_the_fly": false,
+  "user_id": 1
+}

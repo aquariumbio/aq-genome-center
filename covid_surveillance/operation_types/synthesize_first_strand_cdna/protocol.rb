@@ -36,34 +36,25 @@ class Protocol
   include CollectionTransfer
   include CollectionActions
 
-  COV1 = 'COV1'.freeze
-  COV2 = 'COV2'.freeze
+
 #========== Composition Definitions ==========#
 
   AREA_SEAL = "Microseal 'B' adhesive seals"
-  TAGMENT_KIT = 'Tagment PCR Amplicons Kit'
+  FIRST_STRAND_KIT = 'Synthesize First Strand cDNA Kit'
 
-  EBLTS_HT = 'Enrichment BLT HT'
-  TB1_HT = 'Tagmentation Buffer 1 HT'
-  WATER = 'Nuclease-free water'
+  FSM_HT = 'First Strand Mix HT'
+  RVT_HT = 'Reverse Transcriptase HT'
 
   MICRO_TUBES = '1.7 ml Tube'
-  TEST_TUBE = '15 ml Tube'
 
   def components
     [ 
        {
-         input_name: COV1,
+         input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
          object_type: '96-Well Plate'
-       },
-       {
-        input_name: COV2,
-        qty: nil, units: MICROLITERS,
-        sample_name: 'Pooled Specimens',
-        object_type: '96-Well Plate'
-      }
+       }
     ]
   end
 
@@ -80,27 +71,21 @@ class Protocol
   def kits
     [
       {
-        input_name: TAGMENT_KIT,
+        input_name: FIRST_STRAND_KIT,
         qty: 1, units: 'kits',
-        description: 'Kit Tagment PCR Aplicons',
+        description: 'Kit for synthesizing first strand cDNA',
         location: 'M80 Freezer',
         components: [
           {
-            input_name: EBLTS_HT,
-            qty:  3.332, units: MICROLITERS,
-            sample_name: EBLTS_HT,
+            input_name: FSM_HT,
+            qty: 7.2, units: MICROLITERS,
+            sample_name: 'First Strand Mix HT',
             object_type: 'Reagent Bottle'
           },
           {
-            input_name: TB1_HT,
-            qty: 9.91, units: MICROLITERS,
-            sample_name: TB1_HT,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: WATER,
-            qty: 16.666, units: MICROLITERS,
-            sample_name: WATER,
+            input_name: RVT_HT,
+            qty: 0.8, units: MICROLITERS,
+            sample_name: 'Reverse Transcriptase HT',
             object_type: 'Reagent Bottle'
           }
         ],
@@ -109,11 +94,6 @@ class Protocol
             input_name: MICRO_TUBES,
             qty: 1, units: 'Each',
             description: '1.7 ml Tube'
-          },
-          {
-            input_name: TEST_TUBE,
-            qty: 1, units: 'Each',
-            description: TEST_TUBE
           }
         ]
       }
@@ -164,18 +144,16 @@ def main
 
   remove_unpaired_operations(operations - paired_ops)
 
-  paired_ops.make
-
   paired_ops.each do |op|
-    set_up_test(op) if debug
     date = DateTime.now.strftime('%Y-%m-%d')
-    file_name = "#{date}_Op_#{op.id}_Plate_#{op.output(POOLED_PLATE).collection.id}"
+    file_name = "#{date}_Job_#{op.jobs.ids.last}_Op_#{op.id}_Plan_#{op.plan.id}"
+
+    set_up_test(op) if debug
+    temporary_options = op.temporary[:options]
 
     composition = CompositionFactory.build(components: components,
                                            consumables: consumables,
                                            kits: kits)
-
-    temporary_options = op.temporary[:options]
 
     program = LiquidRobotProgramFactory.build(
       program_name: temporary_options[:robot_program]
@@ -185,23 +163,20 @@ def main
                                      name: op.temporary[INSTRUMENT_NAME],
                                      protocol: self)
 
-    # check compatability for all three plates??
-    unless check_robot_compatibility(input_object: op.output(POOLED_PLATE).collection,
+    unless check_robot_compatibility(input_object: op.input(POOLED_PLATE).collection,
                                      robot: robot,
                                      program: program)
       remove_unpaired_operations([op])
       next
     end
 
-    composition.input(COV1).item = op.input(COV1).collection
-    composition.input(COV2).item = op.input(COV2).collection
-    input_plate1 = composition.input(COV1).item
-    input_plate2 = composition.input(COV2).item
-    output_plate = op.output(POOLED_PLATE).collection
-
-    frozen = check_if_frozen([input_plate1, input_plate2])
+    composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
+    plate = composition.input(POOLED_PLATE).item
+    op.pass(POOLED_PLATE)
 
     show_get_composition(composition: composition)
+
+    retrieve_materials([plate])
 
     vortex_objs(composition.kits.map { |kit|
       kit.composition.components.map(&:input_name)
@@ -209,19 +184,7 @@ def main
 
     composition.make_kit_component_items
 
-    retrieve_materials([input_plate1, input_plate2])
-
-    if frozen
-      show_thaw_items([input_plate1, input_plate2])
-      shake(items: [input_plate1, input_plate2],
-            speed: temporary_options[:shaker_parameters][:qty],
-            time: temporary_options[:shaker_parameters][:qty])
-      spin_down(items: [input_plate1, input_plate2],
-                speed: temporary_options[:centrifuge_parameters][:speed],
-                time: temporary_options[:centrifuge_parameters][:time])
-    end
-
-    get_and_label_new_plate(output_plate)
+    robot.turn_on
 
     go_to_instrument(instrument_name: robot.model_and_name)
 
@@ -233,68 +196,51 @@ def main
 
     wait_for_instrument(instrument_name: robot.model_and_name)
 
-    robot.remove_item(item: input_plate1)
-    robot.remove_item(item: input_plate2)
-    robot.remove_item(item: output_plate) 
+    robot.remove_item(item: plate)
 
-    association_map = one_to_one_association_map(from_collection: input_plate1)
+    association_map = one_to_one_association_map(from_collection: plate)
 
-    copy_wells(from_collection: input_plate1,
-               to_collection: output_plate,
-               association_map: association_map)
+    first_strand_comp = composition.input(FIRST_STRAND_KIT).input(FSM_HT)
+    rt_component = composition.input(FIRST_STRAND_KIT).input(RVT_HT)
 
-    composition.components.each do |plate_comp|
-      associate_transfer_collection_to_collection(from_collection: plate_comp.item,
-                                                  to_collection: output_plate,
-                                                  association_map: association_map,
-                                                  transfer_vol: plate_comp.item)
-    end
+    associate_transfer_item_to_collection(
+      from_item: first_strand_comp.item,
+      to_collection: plate,
+      association_map: association_map,
+      transfer_vol: first_strand_comp.qty
+    )
 
-    composition.input(TAGMENT_KIT).components.each do |comp|
-      associate_transfer_item_to_collection(
-        from_item: comp.item,
-        to_collection: output_plate,
-        association_map: association_map,
-        transfer_vol: comp.qty
-      )
-    end
+    associate_transfer_item_to_collection(
+      from_item: rt_component.item,
+      to_collection: plate,
+      association_map: association_map,
+      transfer_vol: rt_component.qty
+    )
 
-    seal_plate(output_plate, seal: composition.input(AREA_SEAL).input_name)
+    seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
 
-    shake(items: [output_plate],
+    shake(items: [plate],
           speed: temporary_options[:shaker_parameters][:speed],
           time: temporary_options[:shaker_parameters][:time])
 
-    store_items([output_plate], location: temporary_options[:storage_location])
-    trash_object([input_plate1, input_plate2])
+    spin_down(items: [plate],
+              speed: temporary_options[:centrifuge_parameters][:speed],
+              time: temporary_options[:centrifuge_parameters][:time])
+
+    store_items([plate], location: temporary_options[:storage_location])
+
+    trash_object(composition.kits.map { |k| k.components.map(&:item) }.flatten)
   end
 
   {}
 
 end
 
-  def set_up_test(op)
-    sample1 = op.input(COV1).part.sample
-    sample2 = op.input(COV2).part.sample
-    plate1 = op.input(COV1).collection
-    plate2 = op.input(COV2).collection
-    samples1 = Array.new(plate1.get_non_empty.length, sample1)
-    samples2 = Array.new(plate2.get_non_empty.length, sample2)
+def set_up_test(op)
+  sample = op.input(POOLED_PLATE).part.sample
+  plate = op.input(POOLED_PLATE).collection
+  samples = Array.new(plate.get_non_empty.length, sample)
+  plate.add_samples(samples)
+end
 
-    plate1.add_samples(samples1)
-    plate2.add_samples(samples2)
-  end
-
-
-  # Redo this and actually check in a good way.  This makes me sad
-  def check_if_frozen(plates)
-    plates.each do |plate|
-      location = plate.location
-      return true if location.include? 'M80'
-      return true if location.include? 'M20'
-      return true if location.include? 'unknown'
-      return true if debug
-      return false
-    end
-  end
 end

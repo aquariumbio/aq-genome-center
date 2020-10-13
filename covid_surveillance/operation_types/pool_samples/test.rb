@@ -7,4 +7,4 @@ class ProtocolTest < ProtocolTestBase
       log('Hello from Nemo')
       assert_equal(@backtrace.last[:operation], 'complete')
     end
-end
+  end
