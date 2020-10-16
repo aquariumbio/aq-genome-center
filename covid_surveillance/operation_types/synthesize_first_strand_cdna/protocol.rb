@@ -36,8 +36,7 @@ class Protocol
   include CollectionTransfer
   include CollectionActions
 
-
-#========== Composition Definitions ==========#
+  #========== Composition Definitions ==========#
 
   AREA_SEAL = "Microseal 'B' adhesive seals"
   FIRST_STRAND_KIT = 'Synthesize First Strand cDNA Kit'
@@ -124,9 +123,9 @@ def default_operation_params
     instrument_model: TestLiquidHandlingRobot::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                        speed: create_qty(qty: 1600, units: RPM) },
+                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 1000, units: TIMES_G) }
+                             speed: create_qty(qty: 1000, units: TIMES_G) }
   }
 end
 

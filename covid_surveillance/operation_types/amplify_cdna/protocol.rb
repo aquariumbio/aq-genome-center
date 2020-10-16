@@ -199,7 +199,7 @@ def main
 
     retrieve_materials([input_plate])
 
-    shake(composition.kits.map { |kit|
+    shake(items: composition.kits.map { |kit|
       kit.composition.components.map(&:input_name)
     }.flatten)
 
