@@ -19,6 +19,8 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'PCR Protocols/RunThermocycler'
+
 
 class Protocol
   include PlanParams
@@ -35,6 +37,7 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include RunThermocycler
 
   #========== Composition Definitions ==========#
 
@@ -44,15 +47,21 @@ class Protocol
   FSM_HT = 'First Strand Mix HT'
   RVT_HT = 'Reverse Transcriptase HT'
 
-  MICRO_TUBES = '1.7 ml Tube'
+  MICRO_TUBES = '1.7 ml Reagent Tube'
 
   def components
     [ 
        {
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: '96-Well Plate'
+         sample_name: nil,
+         object_type: nil
+       },
+       {
+         input_name: MASTER_MIX,
+         qty: 8, units: MICROLITERS,
+         sample_name: MASTER_MIX,
+         object_type: MICRO_TUBES
        }
     ]
   end
@@ -77,13 +86,13 @@ class Protocol
         components: [
           {
             input_name: FSM_HT,
-            qty: 7.2, units: MICROLITERS,
+            qty: 9, units: MICROLITERS,
             sample_name: 'First Strand Mix HT',
             object_type: 'Reagent Bottle'
           },
           {
             input_name: RVT_HT,
-            qty: 0.8, units: MICROLITERS,
+            qty: 1, units: MICROLITERS,
             sample_name: 'Reverse Transcriptase HT',
             object_type: 'Reagent Bottle'
           }
@@ -125,7 +134,10 @@ def default_operation_params
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                          speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                             speed: create_qty(qty: 1000, units: TIMES_G) }
+                             speed: create_qty(qty: 1000, units: TIMES_G) },
+    thermocycler_model: TestThermocycler::MODEL,
+    program_name: 'CDC_TaqPath_CG',
+    qpcr: true
   }
 end
 
@@ -183,6 +195,24 @@ def main
 
     composition.make_kit_component_items
 
+    adj_multiplier = plate.get_non_empty.length
+    mm_components = [composition.input(FIRST_STRAND_KIT).input(FSM_HT),
+                     composition.input(FIRST_STRAND_KIT).input(RVT_HT)]
+    adjust_volume(components: mm_components,
+                  multi: adj_multiplier)
+
+    mm = composition.input(MASTER_MIX)
+
+    mm.item = make_item(sample: mm.sample,
+                        object_type: mm.object_type)
+
+    label_items(objects: [composition.input(FIRST_STRAND_KIT).input(MICRO_TUBES).input_name],
+                labels: [mm.item])
+
+    create_master_mix(components: mm_components,
+                      master_mix_item: mm.item,
+                      adj_qty: true)
+
     robot.turn_on
 
     go_to_instrument(instrument_name: robot.model_and_name)
@@ -199,21 +229,11 @@ def main
 
     association_map = one_to_one_association_map(from_collection: plate)
 
-    first_strand_comp = composition.input(FIRST_STRAND_KIT).input(FSM_HT)
-    rt_component = composition.input(FIRST_STRAND_KIT).input(RVT_HT)
-
     associate_transfer_item_to_collection(
-      from_item: first_strand_comp.item,
+      from_item: composition.input(MASTER_MIX).item,
       to_collection: plate,
       association_map: association_map,
-      transfer_vol: first_strand_comp.qty
-    )
-
-    associate_transfer_item_to_collection(
-      from_item: rt_component.item,
-      to_collection: plate,
-      association_map: association_map,
-      transfer_vol: rt_component.qty
+      transfer_vol: composition.input(MASTER_MIX).volume_hash
     )
 
     seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
@@ -226,10 +246,10 @@ def main
               speed: temporary_options[:centrifuge_parameters][:speed],
               time: temporary_options[:centrifuge_parameters][:time])
 
-    store_items([plate], location: temporary_options[:storage_location])
-
     trash_object(composition.kits.map { |k| k.components.map(&:item) }.flatten)
   end
+
+  run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
   {}
 

@@ -19,7 +19,7 @@
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "Extracted Sample Plate",
       "part": true,
       "array": null,
       "routing": "P"

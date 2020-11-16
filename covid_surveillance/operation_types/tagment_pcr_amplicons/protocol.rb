@@ -19,6 +19,8 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'PCR Protocols/RunThermocycler'
+
 
 class Protocol
   include PlanParams
@@ -35,6 +37,7 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include RunThermocycler
 
   COV1 = 'COV1'.freeze
   COV2 = 'COV2'.freeze
@@ -48,21 +51,33 @@ class Protocol
   WATER = 'Nuclease-free water'
 
   MICRO_TUBES = '1.7 ml Tube'
-  TEST_TUBE = '15 ml Tube'
+  TEST_TUBE = '15 ml Reagent Tube'
 
   def components
-    [ 
+    [
        {
          input_name: COV1,
-         qty: nil, units: MICROLITERS,
+         qty: 10, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
          object_type: '96-Well Plate'
        },
        {
         input_name: COV2,
-        qty: nil, units: MICROLITERS,
+        qty: 10, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
         object_type: '96-Well Plate'
+      },
+      {
+        input_name: MASTER_MIX,
+        qty: 30, units: MICROLITERS,
+        sample_name: MASTER_MIX,
+        object_type: TEST_TUBE
+      },
+      {
+        input_name: WATER,
+        qty: 20, units: MICROLITERS,
+        sample_name: WATER,
+        object_type: 'Reagent Bottle'
       }
     ]
   end
@@ -73,6 +88,11 @@ class Protocol
         input_name: AREA_SEAL,
         qty: 1, units: 'Each',
         description: 'Adhesive Plate Seal'
+      },
+      {
+        input_name: TEST_TUBE,
+        qty: 1, units: 'Each',
+        description: TEST_TUBE
       }
     ]
   end
@@ -87,20 +107,14 @@ class Protocol
         components: [
           {
             input_name: EBLTS_HT,
-            qty:  3.332, units: MICROLITERS,
+            qty:  4, units: MICROLITERS,
             sample_name: EBLTS_HT,
             object_type: 'Reagent Bottle'
           },
           {
             input_name: TB1_HT,
-            qty: 9.91, units: MICROLITERS,
+            qty: 12, units: MICROLITERS,
             sample_name: TB1_HT,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: WATER,
-            qty: 16.666, units: MICROLITERS,
-            sample_name: WATER,
             object_type: 'Reagent Bottle'
           }
         ],
@@ -109,11 +123,6 @@ class Protocol
             input_name: MICRO_TUBES,
             qty: 1, units: 'Each',
             description: '1.7 ml Tube'
-          },
-          {
-            input_name: TEST_TUBE,
-            qty: 1, units: 'Each',
-            description: TEST_TUBE
           }
         ]
       }
@@ -146,7 +155,10 @@ def default_operation_params
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 1000, units: TIMES_G) }
+                            speed: create_qty(qty: 1000, units: TIMES_G) },
+    thermocycler_model: TestThermocycler::MODEL,
+    program_name: 'CDC_TaqPath_CG',
+    qpcr: true
   }
 end
 
@@ -199,15 +211,29 @@ def main
     input_plate2 = composition.input(COV2).item
     output_plate = op.output(POOLED_PLATE).collection
 
-    frozen = check_if_frozen([input_plate1, input_plate2])
+    composition.make_kit_component_items
 
-    show_get_composition(composition: composition)
+    mm = composition.input(MASTER_MIX)
+    adj_multi = input_plate1.get_non_empty.length
+    mm_components = [composition.input(TAGMENT_KIT).input(EBLTS_HT),
+                     composition.input(TAGMENT_KIT).input(TB1_HT),
+                     composition.input(WATER)]
+
+    composition.input(WATER).item = make_item(sample: composition.input(WATER).sample,
+                                              object_type: composition.input(WATER).object_type)
+
+    show_retrieve_components([composition.input(COV1), composition.input(COV2), composition.input(WATER)])
+    show_retrieve_consumables(composition.consumables)
+    show_retrieve_kits(composition.kits)
+
+    mm.item = make_item(sample: mm.sample,
+                        object_type: mm.object_type)
+
+    frozen = check_if_frozen([input_plate1, input_plate2])
 
     vortex_objs(composition.kits.map { |kit|
       kit.composition.components.map(&:input_name)
     }.flatten)
-
-    composition.make_kit_component_items
 
     retrieve_materials([input_plate1, input_plate2])
 
@@ -222,6 +248,17 @@ def main
     end
 
     get_and_label_new_plate(output_plate)
+
+    adjust_volume(components: mm_components,
+                  multi: adj_multi)
+
+    create_master_mix(components: mm_components,
+                     master_mix_item: mm.item,
+                     adj_qty: true)
+
+    label_items(objects: [composition.input(TEST_TUBE).input_name],
+                labels: [mm.item])
+
 
     go_to_instrument(instrument_name: robot.model_and_name)
 
@@ -243,21 +280,22 @@ def main
                to_collection: output_plate,
                association_map: association_map)
 
-    composition.components.each do |plate_comp|
-      associate_transfer_collection_to_collection(from_collection: plate_comp.item,
-                                                  to_collection: output_plate,
-                                                  association_map: association_map,
-                                                  transfer_vol: plate_comp.item)
-    end
+    associate_transfer_collection_to_collection(from_collection: input_plate1,
+                                                to_collection: output_plate,
+                                                association_map: association_map,
+                                                transfer_vol: composition.input(COV1).volume_hash)
 
-    composition.input(TAGMENT_KIT).components.each do |comp|
-      associate_transfer_item_to_collection(
-        from_item: comp.item,
-        to_collection: output_plate,
-        association_map: association_map,
-        transfer_vol: comp.qty
-      )
-    end
+    associate_transfer_collection_to_collection(from_collection: input_plate2,
+                                                to_collection: output_plate,
+                                                association_map: association_map,
+                                                transfer_vol: composition.input(COV2).volume_hash)
+
+    associate_transfer_item_to_collection(
+      from_item: mm.item,
+      to_collection: output_plate,
+      association_map: association_map,
+      transfer_vol: mm.volume_hash
+    )
 
     seal_plate(output_plate, seal: composition.input(AREA_SEAL).input_name)
 
@@ -265,9 +303,10 @@ def main
           speed: temporary_options[:shaker_parameters][:speed],
           time: temporary_options[:shaker_parameters][:time])
 
-    store_items([output_plate], location: temporary_options[:storage_location])
     trash_object([input_plate1, input_plate2])
   end
+
+  run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
   {}
 

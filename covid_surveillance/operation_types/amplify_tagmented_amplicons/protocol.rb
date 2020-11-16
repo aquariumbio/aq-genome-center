@@ -19,6 +19,8 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'PCR Protocols/RunThermocycler'
+
 
 class Protocol
   include PlanParams
@@ -35,6 +37,7 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include RunThermocycler
 
 
 #========== Composition Definitions ==========#
@@ -43,10 +46,10 @@ class Protocol
   AMP_TAG_KIT = 'Amplify Tagmented Amplicons Kit'
 
   EPM_HT = 'Enhanced PCR Mix HT'
-  IDT_PLATE = 'Index Adapter Plate'
+  IDT_PLATE = 'Index Adapter'
   WATER = 'Nuclease-free water'
 
-  TEST_TUBE = '15 ml Tube'
+  TEST_TUBE = '15 ml Reagent Tube'
 
   SPARE_PLATE = '96 Well Plate'
 
@@ -63,6 +66,18 @@ class Protocol
          qty: 24, units: MICROLITERS,
          sample_name: WATER,
          object_type: 'Reagent Bottle'
+      },
+      {
+        input_name: MASTER_MIX,
+        qty: 20, units: MICROLITERS,
+        sample_name: MASTER_MIX,
+        object_type: TEST_TUBE
+      },
+      {
+        input_name: IDT_PLATE,
+        qty: 10, units: MICROLITERS,
+        sample_name: IDT_PLATE,
+        object_type: '96-Well Plate'
       }
     ]
   end
@@ -105,16 +120,9 @@ class Protocol
             qty: 24, units: MICROLITERS,
             sample_name: EPM_HT,
             object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: IDT_PLATE,
-            qty: 10, units: MICROLITERS,
-            sample_name: IDT_PLATE,
-            object_type: '96-Well Plate'
           }
         ],
-        consumables: [
-        ]
+        consumables: []
       }
     ]
   end
@@ -148,7 +156,10 @@ def default_operation_params
                              speed: create_qty(qty: 500, units: TIMES_G) },
     incubation_params: { time: create_qty(qty: 5, units: MINUTES),
                          temperature: create_qty(qty: 'room temperature',
-                                                 units: '') }
+                                                 units: '') },
+    thermocycler_model: TestThermocycler::MODEL,
+    program_name: 'CDC_TaqPath_CG',
+    qpcr: true
   }
 end
 
@@ -198,30 +209,56 @@ end
       kit = composition.input(AMP_TAG_KIT)
 
       composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
-      kit.input(IDT_PLATE).item = op.input(IDT_PLATE).collection
+      composition.input(IDT_PLATE).item = op.input(IDT_PLATE).collection
 
       plate = composition.input(POOLED_PLATE).item
       op.pass(POOLED_PLATE)
-      composition.find_component_items
+      composition.input(WATER).item = find_random_item(
+        sample: composition.input(WATER).sample,
+        object_type: composition.input(WATER).object_type
+      )
       composition.make_kit_component_items
 
-      adjt_multi = plate.get_non_empty.length
-      adj_comp = [kit.input(EPM_HT), composition.input(WATER)]
-      adjust_volume(components: adj_comp,
-                    multi: adjt_multi)
+      mm = composition.input(MASTER_MIX)
+      adj_multi = plate.get_non_empty.length
+      mm_components = [composition.input(AMP_TAG_KIT).input(EPM_HT),
+                       composition.input(WATER)]
 
-      show_get_composition(composition: composition)
+      adjust_volume(components: mm_components,
+                    multi: adj_multi)
 
-      retrieve_materials([plate])
+      mm.item = make_item(sample: mm.sample,
+                          object_type: mm.object_type)
+
+      composition.input(WATER).item = find_random_item(
+        sample: composition.input(WATER).sample,
+        object_type: composition.input(WATER).object_type
+      )
+
+      show_retrieve_components(
+        [composition.input(POOLED_PLATE), composition.input(WATER)]
+      )
+
+      show_retrieve_consumables(composition.consumables)
+      show_retrieve_kits(composition.kits)
+
+      show_get_plate_index_id(plate: composition.input(IDT_PLATE).item,
+                              key: INDEX_KEY)
+
+      label_items(objects: [composition.input(TEST_TUBE).input_name],
+                  labels: [mm.item])
 
       show_thaw_items(kit.composition.components.map(&:input_name))
 
       vortex_objs(kit.composition.components.map(&:input_name))
 
-      open_index_adapter_plate(index_plate: composition.input(AMP_TAG_KIT).input(IDT_PLATE),
-                               pcr_plate: composition.input(SPARE_PLATE))
 
-      create_master_mix(components: adj_comp, vessel: composition.input(TEST_TUBE))
+      create_master_mix(components: mm_components,
+                        master_mix_item: mm.item,
+                        adj_qty: true)
+
+      open_index_adapter_plate(index_plate: composition.input(IDT_PLATE),
+                               pcr_plate: composition.input(SPARE_PLATE))
 
       place_on_magnet(plate)
 
@@ -246,24 +283,20 @@ end
       association_map = one_to_one_association_map(from_collection: plate)
 
       associate_transfer_item_to_collection(
-        from_item: kit.input(EPM_HT).item,
+        from_item: mm.item,
         to_collection: plate,
-        association_map: association_map
-      )
-
-      associate_transfer_item_to_collection(
-        from_item: composition.input(WATER).item,
-        to_collection: plate,
-        association_map: association_map
+        association_map: association_map,
+        transfer_vol: mm.volume_hash
       )
 
       associate_transfer_collection_to_collection(
-        from_collection: kit.input(IDT_PLATE).item,
+        from_collection: composition.input(IDT_PLATE).item,
         to_collection: plate,
-        association_map: association_map
+        association_map: association_map,
+        transfer_vol: composition.input(IDT_PLATE).volume_hash
       )
 
-      plate.associate(INDEX_KEY, kit.input(IDT_PLATE).item.get(INDEX_KEY))
+      plate.associate(INDEX_KEY, composition.input(IDT_PLATE).item.get(INDEX_KEY))
 
       seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
 
@@ -276,9 +309,9 @@ end
                 time: temporary_options[:centrifuge_parameters][:time])
 
       pipet_up_and_down(plate)
-
-      store_items([plate], location: temporary_options[:storage_location])
     end
+
+    run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
     {}
   end
@@ -325,6 +358,19 @@ end
       note "Align a new #{pcr_plate.input_name} above index plate #{index_plate.input_name} and press down to puncture the foil seal"
       note "Discard #{pcr_plate.input_name}"
     end
+  end
+
+  def show_get_plate_index_id(plate:, key:)
+    responses = show do
+      title 'Record Index Adapter Set'
+      note "Please note Illumina-PCR Indexes Set for plate #{plate} (1, 2, 3, 4)"
+      get('number',
+        var: 'set',
+        label: 'Index Set',
+        default: 1)
+      end
+    plate.associate(key,
+                    debug ? rand(4) : responses.get_responses('set'))
   end
 
   def set_up_test(op)

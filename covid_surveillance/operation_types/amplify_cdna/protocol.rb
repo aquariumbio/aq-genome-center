@@ -19,6 +19,8 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'PCR Protocols/RunThermocycler'
+
 
 class Protocol
   include PlanParams
@@ -35,6 +37,7 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include RunThermocycler
 
 # ============= Composition Definitions -==============#
 
@@ -47,7 +50,9 @@ class Protocol
   WATER = 'Nuclease-free water'
 
 
-  TEST_TUBE = '15 ml Tube'
+  TEST_TUBE = '15 ml Reagent Tube'
+
+  MASTER_MIX_2 = 'Master Mix 2'
 
   def components
     [ 
@@ -56,7 +61,37 @@ class Protocol
          qty: 5, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
          object_type: '96-Well Plate'
-       }
+       },
+       {
+         input_name: MASTER_MIX,
+         qty: 20, units: MICROLITERS,
+         sample_name: MASTER_MIX,
+         object_type: TEST_TUBE
+       },
+       {
+        input_name: MASTER_MIX_2,
+        qty: 20, units: MICROLITERS,
+        sample_name: MASTER_MIX,
+        object_type: TEST_TUBE
+       },
+       {
+        input_name: COV1,
+        qty: nil, units: MICROLITERS,
+        sample_name: 'Pooled Specimens',
+        object_type: '96-Well Plate'
+      },
+      {
+        input_name: COV2,
+        qty: nil, units: MICROLITERS,
+        sample_name: 'Pooled Specimens',
+        object_type: '96-Well Plate'
+      },
+      {
+        input_name: WATER,
+        qty: 3.91, units: MICROLITERS,
+        sample_name: WATER,
+        object_type: 'Reagent Bottle'
+      }
     ]
   end
 
@@ -66,6 +101,11 @@ class Protocol
         input_name: AREA_SEAL,
         qty: 1, units: 'Each',
         description: 'Adhesive Plate Seal'
+      },
+      {
+        input_name: TEST_TUBE,
+        qty: 2, units: 'Each',
+        description: TEST_TUBE
       }
     ]
   end
@@ -95,19 +135,6 @@ class Protocol
             qty: 3.58, units: MICROLITERS,
             sample_name: CPP2_HT,
             object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: WATER,
-            qty: 3.91, units: MICROLITERS,
-            sample_name: WATER,
-            object_type: 'Reagent Bottle'
-          }
-        ],
-        consumables: [
-          {
-            input_name: TEST_TUBE,
-            qty: 1, units: 'Each',
-            description: TEST_TUBE
           }
         ]
       }
@@ -139,7 +166,10 @@ def default_operation_params
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 1000, units: TIMES_G) }
+                            speed: create_qty(qty: 1000, units: TIMES_G) },
+    thermocycler_model: TestThermocycler::MODEL,
+    program_name: 'CDC_TaqPath_CG',
+    qpcr: true
   }
 end
 
@@ -191,20 +221,61 @@ def main
     end
 
     composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
+    composition.input(COV1).item = op.output(COV1).collection
+    composition.input(COV2).item = op.output(COV2).collection
     input_plate = composition.input(POOLED_PLATE).item
-    plate1 = op.output(COV1).collection
-    plate2 = op.output(COV2).collection
+    plate1 = composition.input(COV1).item
+    plate2 = composition.input(COV2).item
 
-    show_get_composition(composition: composition)
+    composition.make_kit_component_items
 
-    retrieve_materials([input_plate])
+    mm1 = composition.input(MASTER_MIX)
+    mm2 = composition.input(MASTER_MIX_2)
+    adj_multiplier_1 = plate1.get_non_empty.length
+    adj_multiplier_2 = plate2.get_non_empty.length
+    mm_components_1 = [composition.input(AMPLIFY_KIT).input(IPM_HT),
+                       composition.input(AMPLIFY_KIT).input(CPP1_HT),
+                       composition.input(WATER)]
+    mm_components_2 = [composition.input(AMPLIFY_KIT).input(IPM_HT),
+                       composition.input(AMPLIFY_KIT).input(CPP2_HT),
+                       composition.input(WATER)]
+
+    mm1.item = make_item(sample: mm1.sample,
+                         object_type: mm1.object_type)
+
+    mm2.item = make_item(sample: mm2.sample,
+                         object_type: mm2.object_type)
+
+    composition.input(WATER).item = find_random_item(
+      sample: composition.input(WATER).sample,
+      object_type: composition.input(WATER).object_type
+    )
+
+    show_retrieve_components([composition.input(POOLED_PLATE), composition.input(WATER)])
+    show_retrieve_consumables(composition.consumables)
+    show_retrieve_kits(composition.kits)
 
     shake(items: composition.kits.map { |kit|
       kit.composition.components.map(&:input_name)
     }.flatten)
 
-    composition.make_kit_component_items
+    label_items(objects: [composition.input(TEST_TUBE).input_name,
+                          composition.input(TEST_TUBE).input_name],
+                labels: [mm1.item, mm2.item])
 
+    adjust_volume(components: mm_components_1,
+                  multi: adj_multiplier_1)
+
+    create_master_mix(components: mm_components_1,
+                     master_mix_item: mm1.item,
+                     adj_qty: true)
+
+    adjust_volume(components: mm_components_2,
+                  multi: adj_multiplier_2)
+
+    create_master_mix(components: mm_components_2,
+                      master_mix_item: mm2.item,
+                      adj_qty: true)
     robot.turn_on
 
     go_to_instrument(instrument_name: robot.model_and_name)
@@ -222,21 +293,40 @@ def main
     robot.remove_item(item: plate2)
 
     association_map = one_to_one_association_map(from_collection: input_plate)
-    [plate1, plate2].each do |plate|
-      pp_comp = composition.input(POOLED_PLATE)
-      transfer_from_collection_to_collection(from_collection: input_plate,
-                                             to_collection: plate,
-                                             association_map: association_map,
-                                             transfer_vol: pp_comp.qty)
-      composition.input(AMPLIFY_KIT).components.each do |comp|
-        associate_transfer_item_to_collection(
-          from_item: comp.item,
-          to_collection: plate,
-          association_map: association_map,
-          transfer_vol: comp.qty
-        )
-      end
-    end
+
+    copy_wells(from_collection: input_plate,
+               to_collection: plate1,
+               association_map: association_map)
+
+    copy_wells(from_collection: input_plate,
+               to_collection: plate2,
+               association_map: association_map)
+
+    associate_transfer_item_to_collection(
+      from_item: mm1.item,
+      to_collection: plate1,
+      association_map: association_map,
+      transfer_vol: mm1.volume_hash
+    )
+
+    associate_transfer_collection_to_collection(
+      from_collection: input_plate,
+      to_collection: plate1,
+      association_map: association_map,
+      transfer_vol: composition.input(POOLED_PLATE).volume_hash
+    )
+
+    associate_transfer_item_to_collection(
+      from_item: mm2.item,
+      to_collection: plate2,
+      association_map: association_map,
+      transfer_vol: mm2.volume_hash
+    )
+
+    associate_transfer_collection_to_collection(from_collection: input_plate,
+                                                to_collection: plate2,
+                                                association_map: association_map,
+                                                transfer_vol: composition.input(POOLED_PLATE).volume_hash)
 
     seal_plate(plate1, seal: composition.input(AREA_SEAL).input_name)
     seal_plate(plate2, seal: composition.input(AREA_SEAL).input_name)
@@ -249,10 +339,12 @@ def main
               speed: temporary_options[:centrifuge_parameters][:speed],
               time: temporary_options[:centrifuge_parameters][:time])
 
-    store_items([plate1, plate2], location: temporary_options[:storage_location])
-    trash_object([input_plate,
-                  composition.kits.map { |k| k.components.map(&:item) }].flatten)
   end
+
+  # TODO These should run parallel not in sequence (this actually may be just fine)
+  run_qpcr(operations: operations, item_key: COV1)
+
+  run_qpcr(operations: operations, item_key: COV1)
 
   {}
 

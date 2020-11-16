@@ -19,6 +19,8 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'PCR Protocols/RunThermocycler'
+
 
 class Protocol
   include PlanParams
@@ -35,6 +37,7 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include RunThermocycler
 
 
 #========== Composition Definitions ==========#
@@ -94,8 +97,7 @@ class Protocol
             object_type: 'Reagent Bottle'
           }
         ],
-        consumables: [
-        ]
+        consumables: []
       }
     ]
   end
@@ -129,7 +131,10 @@ def default_operation_params
                             speed: create_qty(qty: 500, units: TIMES_G) },
     incubation_params: { time: create_qty(qty: 5, units: MINUTES),
                          temperature: create_qty(qty: 'room temperature',
-                                                 units: '') }
+                                                 units: '') },
+    thermocycler_model: TestThermocycler::MODEL,
+    program_name: 'CDC_TaqPath_CG',
+    qpcr: true
   }
 end
 
@@ -260,8 +265,9 @@ def main
 
     place_on_magnet(plate)
 
-    store_items([plate], location: temporary_options[:storage_location])
   end
+
+  run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
   {}
 

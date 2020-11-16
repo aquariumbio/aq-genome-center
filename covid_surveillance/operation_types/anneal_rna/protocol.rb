@@ -11,17 +11,16 @@ needs 'Standard Libs/CommonInputOutputNames'
 
 needs 'Covid Surveillance/SampleConstants'
 needs 'Covid Surveillance/AssociationKeys'
-needs 'Covid Surveillance/AnnealRNACompositionDefinitions'
 
 needs 'Liquid Robot Helper/RobotHelper'
-
-#needs 'Microtiter Plates/MicrotiterPlates'
 
 needs 'CompositionLibs/AbstractComposition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
 needs 'Collection Management/CollectionTransfer'
+
+needs 'PCR Protocols/RunThermocycler'
 
 class Protocol
   include PlanParams
@@ -34,10 +33,57 @@ class Protocol
   include AssociationKeys
   include RobotHelper
   include CommonInputOutputNames
-  include AnnealRNACompositionDefinitions
   include CompositionHelper
   include CollectionActions
   include CollectionTransfer
+  include RunThermocycler
+
+############ Composition Parts ###########
+  AREA_SEAL = "Microseal 'B' adhesive seals"
+  ANNEAL_KIT = 'Anneal RNA Kit'
+
+  EPH_HT = 'EPH3 HT'
+
+  def components
+    [ 
+       {
+         input_name: POOLED_PLATE,
+         qty: 8.5, units: MICROLITERS,
+         sample_name: 'Pooled Specimens',
+         object_type: '96-Well Plate'
+       }
+    ]
+  end
+
+  def consumables
+    [
+      {
+        input_name: AREA_SEAL,
+        qty: 1, units: 'Each',
+        description: 'Adhesive Plate Seal'
+      }
+    ]
+  end
+
+  def kits
+    [
+      {
+        input_name: ANNEAL_KIT,
+        qty: 1, units: 'kits',
+        description: 'RNA Annealing Kit',
+        location: 'M80 Freezer',
+        components: [
+          {
+            input_name: EPH_HT,
+            qty: 8.5, units: MICROLITERS,
+            sample_name: 'Elution Prime Fragment 3HC Mix',
+            object_type: 'Reagent Bottle'
+          }
+        ],
+        consumables: []
+      }
+    ]
+  end
 
 ########## DEFAULT PARAMS ##########
 
@@ -64,7 +110,10 @@ def default_operation_params
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 1000, units: TIMES_G) }
+                            speed: create_qty(qty: 1000, units: TIMES_G) },
+    thermocycler_model: TestThermocycler::MODEL,
+    program_name: 'CDC_TaqPath_CG',
+    qpcr: true
   }
 end
 
@@ -171,10 +220,9 @@ def main
               speed: temporary_options[:centrifuge_parameters][:speed],
               time: temporary_options[:centrifuge_parameters][:time])
 
-    store_items([cdna], location: temporary_options[:storage_location])
-    trash_object([plate,
-                  composition.kits.map{ |k| k.components.map(&:item) }].flatten)
   end
+
+  run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
   {}
 

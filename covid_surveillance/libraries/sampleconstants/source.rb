@@ -10,4 +10,6 @@ module SampleConstants
 
   POOLED_LIB = 'Pooled Library'.freeze
 
+  MASTER_MIX = 'Master Mix'.freeze
+
 end
