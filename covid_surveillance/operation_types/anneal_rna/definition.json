@@ -1,6 +1,5 @@
 {
-  "id": 5,
-  "name": "Plate RNA Extraction",
+  "name": "Anneal RNA",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",
   "inputs": [
@@ -19,7 +18,7 @@
   ],
   "outputs": [
     {
-      "name": "Extracted Sample Plate",
+      "name": "Pooled Sample Plate",
       "part": true,
       "array": null,
       "routing": "P"

@@ -8,4 +8,8 @@ module SampleConstants
   SAMPLE_TYPE = 'Sample Type'.freeze
   OBJECT_TYPE = 'Object Type'.freeze
 
+  POOLED_LIB = 'Pooled Library'.freeze
+
+  MASTER_MIX = 'Master Mix'.freeze
+  PLATE_OBJECT_TYPE = '96-Well Plate'.freeze
 end
