@@ -26,16 +26,29 @@ module PoolSamplesHelper
   # @param max_specimens [FixNum] the max number of specimens per operation
   # @return void
   def validate(operations:, max_specimens:)
+    cts = []
     operations.each do |op|
-      next unless op.input_array(SPECIMEN).length > max_specimens
+      n_specimens = op.input_array(SPECIMEN).length
+      cts.append(n_specimens)
+      next unless n_specimens > max_specimens
 
-      msg = 'This operation failed validation because it had too many inputs.'
-      op.error(:max_specimens_exceeded, msg)
+      msg = "operation has #{n_specimens} specimens when only #{max_specimens} are allowed"
+      op.error(:input_error, msg)
       show do
-        title "Operation #{op.id} failed validation"
-        note msg
+        title 'Job failed validation'
+        note "Operation #{op.id} failed validation because it has too many inputs."
         warning 'This job will terminate early.'
       end
+    end
+
+    return if cts.uniq.length == 1
+
+    msg = "operations have unequal numbers of inputs #{cts}"
+    operations.each { |op| op.error(:input_error, msg) }
+    show do
+      title 'Job failed validation'
+      note 'This protocol requires all the opertations to have the same number of inputs.'
+      warning 'This job will terminate early.'
     end
   end
 
@@ -104,7 +117,12 @@ module PoolSamplesHelper
   # @param item [Item]
   # @return [Hash]
   def hash_data(item)
-    { item: item, barcode: item.sample.properties.fetch('Barcode ID') }
+    {
+      item: item,
+      specimen_barcode: item.sample.properties.fetch('Specimen Barcode'),
+      rack_barcode: item.sample.properties.fetch('Rack Barcode'),
+      rack_location: item.sample.properties.fetch('Rack Location')
+    }
   end
 
   def inspect_first_three(collection)

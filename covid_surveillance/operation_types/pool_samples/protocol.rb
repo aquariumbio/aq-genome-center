@@ -15,7 +15,7 @@ class Protocol
   #
   def default_job_params
     {
-      max_specimens_per_operation: 960,
+      max_specimens_per_operation: 96,
       pool_size: 10,
       pooling_method: 'By Batch',
       sample_rack: { dimensions: [1, 10], name: 'Specimen Rack' },
