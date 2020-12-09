@@ -94,6 +94,24 @@ module PoolSamplesHelper
     )
   end
 
+  # Creates a new MicrotiterPlate to wrap the provided collection and adds
+  #   the provided pooling groups to the collections provenance map
+  #
+  # @param collection [Collection]
+  # @param pooling_groups [Array<Item>]
+  # @return [MicrotiterPlate]
+  def add_pools_by_well(collection:, pooling_groups:)
+    microtiter_plate = MicrotiterPlateFactory.build(
+      collection: collection,
+      group_size: 1,
+      method: nil
+    )
+    add_provenance_by_well(
+      microtiter_plate: microtiter_plate,
+      pooling_groups: pooling_groups
+    )
+  end
+
   private
 
   # Adds the provided pooling groups to the provenance map of
@@ -112,6 +130,23 @@ module PoolSamplesHelper
     microtiter_plate
   end
 
+  # Adds the provided pooling groups to the provenance map of
+  #   the MicrotiterPlate
+  #
+  # @param microtiter_plate [MicrotiterPlate]
+  # @param pooling_groups [Array<Item>]
+  # @return [MicrotiterPlate]
+  def add_provenance_by_well(microtiter_plate:, pooling_groups:)
+    pooling_groups.each do |alphanum, pooling_group|
+      microtiter_plate.associate_provenance(
+        index: alphanum_to_rc(alphanum),
+        key: :specimens,
+        data: pooling_group.map { |item| hash_data(item) }
+      )
+    end
+    microtiter_plate
+  end
+
   # Creates a provenance hash for the provided item
   #
   # @param item [Item]
@@ -120,8 +155,8 @@ module PoolSamplesHelper
     properties = item.sample.properties
     default = 'not found'
     specimen_barcode = properties.fetch('Specimen Barcode', default)
-    rack_barcode = properties.fetch('Rack Barcode', default)
-    rack_location = properties.fetch('Rack Location', default)
+    rack_barcode = properties.fetch('Ingest Rack Barcode', default)
+    rack_location = properties.fetch('Ingest Rack Location', default)
     {
       item: item,
       specimen_barcode: specimen_barcode,

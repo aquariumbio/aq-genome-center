@@ -13,4 +13,8 @@ module PoolingHelper
       raise 'Invalid pooling method'
     end
   end
+
+  def pool_by_well(items:)
+    items.group_by { |i| i.sample.properties.fetch('Ingest Rack Location') }
+  end
 end

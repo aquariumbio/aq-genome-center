@@ -16,8 +16,8 @@ class Protocol
   def default_job_params
     {
       max_specimens_per_operation: 96,
-      pool_size: 10,
-      pooling_method: 'By Batch',
+      pool_size: 4,
+      pooling_method: 'Wells',
       sample_rack: { dimensions: [1, 10], name: 'Specimen Rack' },
       transfer_volume: { qty: 5, units: MICROLITERS },
       plate_location: 'M20'
@@ -53,18 +53,16 @@ class Protocol
     ops_by_plate.each do |sample, ops|
       ops.retrieve
 
-      pooling_groups = create_pooling_groups(
-        items: collect_specimens(operations: ops),
-        pool_size: @job_params[:pool_size],
-        pooling_method: @job_params[:pooling_method]
+      pooling_groups = pool_by_well(
+        items: collect_specimens(operations: ops)
       )
 
-      microtiter_plate = add_pools(
+      microtiter_plate = add_pools_by_well(
         collection: create_output_collection(sample: sample, operations: ops),
         pooling_groups: pooling_groups
       )
 
-      inspect_first_three(microtiter_plate.collection) if debug
+      inspect_first_three(microtiter_plate.collection)
 
       # ops.each do |op|
       #   pool_manually(operation: op,
