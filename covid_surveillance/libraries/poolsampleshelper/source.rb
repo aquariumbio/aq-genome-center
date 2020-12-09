@@ -117,11 +117,16 @@ module PoolSamplesHelper
   # @param item [Item]
   # @return [Hash]
   def hash_data(item)
+    properties = item.sample.properties
+    default = 'not found'
+    specimen_barcode = properties.fetch('Specimen Barcode', default)
+    rack_barcode = properties.fetch('Rack Barcode', default)
+    rack_location = properties.fetch('Rack Location', default)
     {
       item: item,
-      specimen_barcode: item.sample.properties.fetch('Specimen Barcode'),
-      rack_barcode: item.sample.properties.fetch('Rack Barcode'),
-      rack_location: item.sample.properties.fetch('Rack Location')
+      specimen_barcode: specimen_barcode,
+      rack_barcode: rack_barcode,
+      rack_location: rack_location
     }
   end
 
