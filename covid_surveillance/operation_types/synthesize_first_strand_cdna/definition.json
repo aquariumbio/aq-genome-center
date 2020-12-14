@@ -1,5 +1,4 @@
 {
-  "id": 12,
   "name": "Synthesize First Strand cDNA",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",

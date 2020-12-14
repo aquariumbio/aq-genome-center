@@ -1,5 +1,4 @@
 {
-  "id": 10,
   "name": "Pool and Cleanup Library",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",
