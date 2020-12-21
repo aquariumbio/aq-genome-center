@@ -11,6 +11,7 @@ needs 'Small Instruments/Shakers'
 needs 'Standard Libs/Units'
 needs 'Covid Surveillance/SampleConstants'
 needs 'Covid Surveillance/AssociationKeys'
+needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'CompositionLibs/AbstractComposition'
@@ -19,6 +20,7 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'Kits/KitContents'
 
 class Protocol
   include PlanParams
@@ -35,87 +37,52 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include CovidSurveillanceHelper
+  include KitContents
 
+ #========== Composition Definitions ==========#
 
-#========== Composition Definitions ==========#
+  COMPOSITION_KEY = 'composition'
 
-  AREA_SEAL = "Microseal 'B' adhesive seals"
-  MIX_CONTAINER = 'Plastic Mixing Container'
-  ASSAY_TUBE = 'Qubit assay tubes'
-  ASSAY_ITEM = 'Item Assay'
-
+  POOLED_LIBRARY = 'Pooled Library'
+  KIT_SAMPLE_NAME = 'dsDNA HS Assay Kit'
   def components
     [ 
-       {
-         input_name: POOLED_LIB,
-         qty: nil, units: MICROLITERS,
-         sample_name: 'Pooled Library',
-         object_type: '1.7 ml Tube'
-       },
-       {
-         input_name: STANDARD_1,
-         qty: nil, units: MICROLITERS,
-         sample_name: 'QBIT Standard 1',
-         object_type: 'Reagent Bottle'
-       },
-       {
-        input_name: STANDARD_2,
-        qty: nil, units: MICROLITERS,
-        sample_name: 'QBIT Standard 2',
-        object_type: 'Reagent Bottle'
+      {
+        input_name: POOLED_LIBRARY,
+        qty: 10, units: MICROLITERS,
+        sample_name: nil,
+        object_type: nil,
+        notes: 'na'
       },
       {
-        input_name: ASSAY_ITEM,
-        qty: nil, units: MICROLITERS,
-        sample_name: 'QBIT Test Assay',
-        object_type: 'Reagent Bottle'
-      }
+        input_name: MASTER_MIX,
+        qty: 180, units: MICROLITERS,
+        sample_name: MASTER_MIX,
+        object_type: 'Reagent Bottle',
+        notes: 'na'
+     },
+     {
+      input_name: RSB_HT,
+      qty: nil, units: MICROLITERS,
+      sample_name: 'nil',
+      object_type: 'Reagent Bottle',
+      notes: 'Thaw and Keep on Ice'
+    },
     ]
   end
 
   def consumables
     [
       {
-        input_name: AREA_SEAL,
+        input_name: TEST_TUBE,
         qty: 1, units: 'Each',
-        description: 'Adhesive Plate Seal'
+        description: TEST_TUBE
       },
       {
-        input_name: MIX_CONTAINER,
+        input_name: MICRO_TUBE,
         qty: 1, units: 'Each',
-        description: 'A plastic mixing container'
-      },
-      {
-        input_name: ASSAY_TUBE,
-        qty: 1, units: 'Each',
-        description: 'Assay tube'
-      }
-    ]
-  end
-
-  def kits
-    [
-      {
-        input_name: POST_TAG_KIT,
-        qty: 1, units: 'kits',
-        description: 'Kit for synthesizing first strand cDNA',
-        location: 'M80 Freezer',
-        components: [
-          {
-            input_name: ST2_HT,
-            qty: 10, units: MICROLITERS,
-            sample_name: ST2_HT,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: TWB_HT,
-            qty: 100, units: MICROLITERS,
-            sample_name: TWB_HT,
-            object_type: 'Reagent Bottle'
-          }
-        ],
-        consumables: [
-        ]
+        description: MICRO_TUBE
       }
     ]
   end
@@ -140,197 +107,198 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    instrument_model: TestLiquidHandlingRobot::MODEL,
-    storage_location: 'M80',
-    #shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
-    #                    speed: create_qty(qty: 1600, units: RPM) },
-    #centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-    #                        speed: create_qty(qty: 500, units: TIMES_G) },
-    incubation_params: { time: create_qty(qty: 2, units: MINUTES),
+    shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
+                         speed: create_qty(qty: 1600, units: RPM) },
+    centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
+                             speed: create_qty(qty: 500, units: TIMES_G) },
+    incubation_params: { time: create_qty(qty: 5, units: MINUTES),
                          temperature: create_qty(qty: 'room temperature',
                                                  units: '') }
   }
 end
 
-########## MAIN ##########
+  ########## MAIN ##########
 
-def main
-  @job_params = update_all_params(
-    operations: operations,
-    default_job_params: default_job_params,
-    default_operation_params: default_operation_params
-  )
+  def main
+    target_volume = 35 # ul
+    target_molarity = 4 # nM
+    @job_params = update_all_params(
+      operations: operations,
+      default_job_params: default_job_params,
+      default_operation_params: default_operation_params
+    )
 
-  assay_warning
+    required_reactions = operations.length + 2
 
-  operations.make
-  operations.retrieve
+    operations.make
 
-  operations.each do |op|
-    # TODO pull these components from the operation parameters or something
-    composition = CompositionFactory.build(components: components,
-                                           consumables: consumables,
-                                           kits: kits)
-    op.temporary[:composition] = composition
-    composition.input(POOLED_LIB).item = op.input(POOLED_LIB).item
-    meas_comp = composition.input(ASSAY_ITEM)
-    meas_comp.item = make_item(sample: comp.sample,
-                               object_type: comp.object_type)
-    show_get_composition(composition: composition)
-  end
+    retrieve_list = []
 
-  compositions = operations.map { |op| op.temporary[:composition] }
-  label_items(object: compositions.map { |comp| comp.input(MIX_CONTAINER).input_name },
-              labels: composition.map { |comp| comp.input(ASSAY_ITEM).item } )
+    operations.each_with_index do |op, idx|
+      composition, _kit_ = setup_kit_composition(
+        kit_sample_name: KIT_SAMPLE_NAME,
+        num_reactions_required: create_qty(qty:required_reactions, units: 'rxn'),
+        components: components,
+        consumables: consumables
+      )
 
+      composition.input(POOLED_LIBRARY).item = op.input(POOLED_LIBRARY).item
 
+      adj_vol_list = reject_components(
+        list_of_rejections: [POOLED_LIBRARY, MASTER_MIX, RSB_HT],
+        components: composition.components
+      )
 
+      op.temporary[COMPOSITION_KEY] = composition
 
-  #paired_ops.each do |op|
-    # set_up_test(op) if debug
-    # temporary_options = op.temporary[:options]
+      adjust_volume(components: adj_vol_list,
+                    multi: required_reactions)
+      if idx == 0
+        retrieve_list += reject_components(
+          list_of_rejections: [POOLED_LIBRARY, MASTER_MIX],
+          components: composition.components
+        )
+      end
 
-    # composition = CompositionFactory.build(components: components,
-    #                                        consumables: consumables,
-    #                                        kits: kits)
-
-    # composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
-    # plate = composition.input(POOLED_PLATE).item
-    # op.pass(POOLED_PLATE)
-
-    # show_get_composition(composition: composition)
-
-    # retrieve_materials([plate])
-
-    # vortex_objs(composition.kits.map { |kit|
-    #   kit.composition.components.map(&:input_name)
-    # }.flatten)
-
-    # composition.make_kit_component_items
-
-    # association_map = one_to_one_association_map(from_collection: plate)
-    # kit = composition.input(POST_TAG_KIT)
-
-    # spin_down(items: [plate],
-    #           speed: temporary_options[:centrifuge_parameters][:speed],
-    #           time: temporary_options[:centrifuge_parameters][:time])
-
-    # multichannel_item_to_collection(to_collection: plate,
-    #                                 source: kit.input(ST2_HT).item,
-    #                                 volume: kit.input(ST2_HT).volume_hash,
-    #                                 association_map: association_map,
-    #                                 verbose: false)
-
-    # associate_transfer_item_to_collection(
-    #   from_item: kit.input(ST2_HT).item,
-    #   to_collection: plate,
-    #   association_map: association_map,
-    #   transfer_vol: kit.input(ST2_HT).volume_hash
-    # )
-
-    # seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
-
-    # shake(items: [plate],
-    #       speed: temporary_options[:shaker_parameters][:speed],
-    #       time: temporary_options[:shaker_parameters][:time])
-
-    # show_incubate_items(
-    #   items: [plate],
-    #   time: temporary_options[:incubation_params][:time],
-    #   temperature: temporary_options[:incubation_params][:temperature]
-    # )
-
-    # spin_down(items: [plate],
-    #           speed: temporary_options[:centrifuge_parameters][:speed],
-    #           time: temporary_options[:centrifuge_parameters][:time])
-
-    # place_on_magnet(plate)
-
-    # if show_inspect_for_bubbles(plate)
-    #   spin_down(items: [plate],
-    #             speed: temporary_options[:centrifuge_parameters][:speed],
-    #             time: temporary_options[:centrifuge_parameters][:time])
-    # end
-
-    # remove_discard_supernatant([plate])
-
-    # multichannel_item_to_collection(to_collection: plate,
-    #                                 source: kit.input(TWB_HT).item,
-    #                                 volume: kit.input(TWB_HT).volume_hash,
-    #                                 association_map: association_map,
-    #                                 verbose: false)
-
-    # seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
-
-    # shake(items: [plate],
-    #       speed: temporary_options[:shaker_parameters][:speed],
-    #       time: temporary_options[:shaker_parameters][:time])
-
-    # spin_down(items: [plate],
-    #           speed: temporary_options[:centrifuge_parameters][:speed],
-    #           time: temporary_options[:centrifuge_parameters][:time])
-
-    # place_on_magnet(plate)
-
-    # remove_discard_supernatant([plate])
-
-    # multichannel_item_to_collection(to_collection: plate,
-    #                                 source: kit.input(TWB_HT).item,
-    #                                 volume: kit.input(TWB_HT).volume_hash,
-    #                                 association_map: association_map,
-    #                                 verbose: false)
-
-    # associate_transfer_item_to_collection(
-    #   from_item: kit.input(TWB_HT).item,
-    #   to_collection: plate,
-    #   association_map: association_map,
-    #   transfer_vol: kit.input(TWB_HT).volume_hash
-    # )
-
-    # seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
-
-    # shake(items: [plate],
-    #       speed: temporary_options[:shaker_parameters][:speed],
-    #       time: temporary_options[:shaker_parameters][:time])
-
-    # spin_down(items: [plate],
-    #           speed: temporary_options[:centrifuge_parameters][:speed],
-    #           time: temporary_options[:centrifuge_parameters][:time])
-
-    # place_on_magnet(plate)
-
-    # store_items([plate], location: temporary_options[:storage_location])
-  #end
-
-  {}
-
-end
-
-
-  def set_up_test(op)
-    sample = op.input(POOLED_PLATE).part.sample
-    plate = op.input(POOLED_PLATE).collection
-    samples = Array.new(plate.get_empty.length, sample)
-    plate.add_samples(samples)
-  end
-
-  def assay_warning
-    show do
-      title 'Temperature Sensitive Assay'
-      warning 'This assay is sensitive to temperature fluctuation'
-      bullet 'Ensure all components of the assay stay at room temperature (22 - 28 deg C)'
-      bullet 'Avoid holding assay tubes in your hand when'
-      bullet 'Do not leave assay tubes on the Fluorometer longer than needed'
+      retrieve_list.append(composition.input(POOLED_LIBRARY))
+      retrieve_list += composition.consumables
     end
-  end
 
-  def equilibrate_to_room_temp(item)
+    show_retrieve_parts(retrieve_list)
+
+    first_composition = operations.first.temporary[COMPOSITION_KEY]
+    mm_components = [first_composition.input(COMP_B),
+                     first_composition.input(COMP_A)]
+
+    show_block_1a = master_mix_handler(
+      components: mm_components,
+      mm: first_composition.input(MASTER_MIX),
+      adjustment_multiplier: required_reactions,
+      mm_container: first_composition.input(TEST_TUBE)
+    )
+
     show do
-      title 'Equilibrate to Room Temperature'
-      note "Let item #{item} equilibrate to room temperature (~ 30 Seconds)"
+      title 'Prepare Items'
+      note show_block_1a
     end
-  end
 
+    sample_list = [first_composition.input(QBIT_TUBE),
+                   first_composition.input(QBIT_TUBE)]
+    label_list = ['s-1','s-2']
+
+    operations.each do |op|
+      comp = op.temporary[COMPOSITION_KEY]
+      label_list.append("s-#{comp.input(POOLED_LIBRARY).item}")
+      sample_list.append(comp.input(QBIT_TUBE))
+    end
+
+    show_block_2a = label_items(
+      objects: sample_list,
+      labels: label_list
+    )
+
+    show_block_2b = pipet(volume: first_composition.input(MASTER_MIX).volume_hash,
+                          source: first_composition.input(MASTER_MIX),
+                          destination: label_list.to_s)
+
+    show_block_2c = pipet(volume: first_composition.input(COMP_C).volume_hash,
+                          source: first_composition.input(MASTER_MIX),
+                          destination: 's-1')
+
+    show_block_2d = pipet(volume: first_composition.input(COMP_D).volume_hash,
+                          source: first_composition.input(MASTER_MIX),
+                          destination: 's-2')
+
+    show_block_2e = []
+    operations.each do |op|
+      composition = op.temporary[COMPOSITION_KEY]
+
+      show_block_2e.append(pipet(
+        volume: composition.input(POOLED_LIBRARY).volume_hash,
+        source: first_composition.input(POOLED_LIBRARY),
+        destination: "s-#{composition.input(POOLED_LIBRARY).item}"
+        ))
+    end
+
+    show do
+      title 'Prepare Test'
+      note show_block_2a
+      separator
+      note show_block_2b
+      separator
+      note show_block_2c
+      separator
+      note show_block_2d
+      separator
+      note show_block_2e
+    end
+    sample_vol = qty_display(operations.first.temporary[COMPOSITION_KEY].input(POOLED_LIBRARY).volume_hash)
+    concentrations = show do
+      title 'Run Samples'
+      note 'Go to and turn on Qubit'
+      note "Press 'DNA' --> 'dsDNA' --> 'High Sensisitivity' --> 'Read Standards' "
+      note "Insert <b>s-1</b> and press 'Read Standard'"
+      note "Insert <b>s-2</b> and press 'Read Standard'"
+      separator
+      note "Press 'Run Samples'"
+      note "Set volume to <b>#{sample_vol}"
+      note "Set units to #{NANOGRAMS}/#{MICROLITERS}"
+      note 'Place each sample in th Qubit and press "run"'
+      operations.each do |op|
+        composition = op.temporary[COMPOSITION_KEY]
+        get("number", var: composition.input(POOLED_LIBRARY).item.id.to_s, 
+                      label: "Enter concentration in #{NANOGRAMS}/#{MICROLITERS}",
+                      default: '')
+      end
+    end
+
+    operations.each do |op|
+      composition = op.temporary[COMPOSITION_KEY]
+      con = concentrations[composition.input(POOLED_LIBRARY).item.id.to_s]
+      con = rand(0.97...3) if debug
+      molarity = con * (10**6) / (600.0 * 400.0)
+      if molarity < target_molarity
+        inspect "Molarity #{molarity}, concentration: #{con}" if debug
+        op.error(:molarity_too_low, 'Molarity too low')
+        op.status = 'error'
+        op.save
+        next
+      end
+
+      volume_sample = target_molarity * target_volume / molarity
+      volume_buffer = target_volume - volume_sample
+
+      if debug
+        inspect "samp: #{volume_sample}, buff: #{volume_buffer}, "\
+                " concentration: #{con}"
+      end
+
+      show_block_3a = label_items(
+        objects: [composition.input(MICRO_TUBE)],
+        labels: [op.output(POOLED_LIBRARY).item]
+      )
+
+      show_block_3b = pipet(
+        volume: create_qty(qty: volume_sample, units: MICROLITERS),
+        source: composition.input(POOLED_LIBRARY),
+        destination: op.output(POOLED_LIBRARY).item)
+
+      show_block_3c = pipet(
+        volume: create_qty(qty: volume_buffer, units: MICROLITERS),
+        source: composition.input(RSB_HT),
+        destination: op.output(POOLED_LIBRARY).item)
+ 
+      show do 
+        title 'Dilute Library'
+        note show_block_3a
+        separator
+        note show_block_3b
+        separator
+        note show_block_3c
+      end
+    end
+
+    {}
+  end
 
 end

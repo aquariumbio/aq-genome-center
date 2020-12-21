@@ -26,7 +26,7 @@ module CovidSurveillanceHelper
 
     composition = CompositionFactory.build(
       components: components.append(kit.components).flatten,
-      consumables: consumables.append(kit.consumables).flatten,
+      consumables: consumables.append(kit.consumables).flatten
     )
     set_kit_item(kit, composition)
     [composition, kit]
@@ -45,15 +45,19 @@ module CovidSurveillanceHelper
     return_components
   end
 
-  def master_mix_handler(components:, mm:, adjustment_multiplier:, mm_container:)
+  def master_mix_handler(components:, mm:, mm_container:, adjustment_multiplier: nil)
     mm.item = make_item(sample: mm.sample,
                         object_type: mm.object_type)
     show_block = label_items(
       objects: [mm_container],
-      labels: [mm.item]
+      labels: ["#{mm.input_name}-#{mm.item}"]
     )
-    adjust_volume(components: components,
-                  multi: adjustment_multiplier)
+
+    if adjustment_multiplier
+      adjust_volume(components: components,
+                    multi: adjustment_multiplier)
+    end
+
     show_block += create_master_mix(
       components: components,
       master_mix: mm,
@@ -64,21 +68,76 @@ module CovidSurveillanceHelper
 
   def use_robot(program:, robot:, items:)
     show_block = []
-    show_block.append(robot.select_program_template(program: program))
+
+    show_block.append(
+      { display: robot.move_to_robot,
+        type: 'note' }
+    )
+
+    show_block.append(
+      { display: robot.select_program_template(program: program),
+        type: 'note' }
+    )
+
+    show_block.append(
+      { display: robot.setup_program_image(program: program),
+        type: 'image' }
+    )
+
     items.each do |item|
-      show_block.append(robot.place_item(item: item))
+      show_block.append(
+        { display: robot.place_item(item: item),
+          type: 'note' }
+      )
     end
-    show_block.append(robot.follow_template_instructions)
-    show_block.append(wait_for_instrument(instrument_name: robot.model_and_name))
+
+    # SOmething about order of plates
+
+    show_block.append(
+      { display: robot.follow_template_instructions,
+        type: 'note' }
+    )
+
+    show_block.append(
+      { display: robot.start_run,
+        type: 'note'}
+    )
+    show_block.append(
+      { display: wait_for_instrument(instrument_name: robot.model_and_name),
+        type: 'note' }
+    )
+  end
+
+  # Creates show block following instructions for show block
+  #
+  # @param title 'String' the string of things to show
+  # @param hash_to_show: 'Array<Hash>' hash to represent each line
+  def display_hash(title:, hash_to_show:)
+    show do
+      title title
+      hash_to_show.each do |block|
+        raise 'block is nil' if block.empty?
+
+        if block.is_a? Array
+          block.each do |line|
+            send(line[:type], line[:display])
+          end
+        else
+          send(block[:type], block[:display])
+        end
+        separator
+      end
+    end
   end
 
 
   # Instructions to place plate on some magnets
   #
   # @param plate [Item]
-  def place_on_magnet(plate)
+  def place_on_magnet(plate, time_min: 3)
     show_block = []
-    show_block.append("Put plate #{plate} on magnetic stand and wait until clear (~3 Min)")
+    show_block.append("Put plate #{plate} on magnetic stand and wait until"\
+                      " clear (~#{time_min} Min)")
   end
 
   # Instructions to remove plate from magnet

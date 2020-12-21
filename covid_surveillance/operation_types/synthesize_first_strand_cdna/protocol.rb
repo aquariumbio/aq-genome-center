@@ -24,6 +24,7 @@ needs 'PCR Protocols/RunThermocycler'
 
 needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
+needs 'Kits/KitContents'
 
 class Protocol
   include PlanParams
@@ -43,6 +44,7 @@ class Protocol
   include RunThermocycler
   include KitHelper
   include CovidSurveillanceHelper
+  include KitContents
 
   #========== Composition Definitions ==========#
 
@@ -101,8 +103,8 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    robot_model: TestLiquidHandlingRobot::MODEL,
+    dragonfly_robot_program: 'FS CDNA MM',
+    dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                          speed: create_qty(qty: 1600, units: RPM) },
@@ -176,22 +178,23 @@ def main
       note show_block_1b.flatten
     end
 
-    program = LiquidRobotProgramFactory.build(
-      program_name: temporary_options[:robot_program]
+
+    drgprogram = LiquidRobotProgramFactory.build(
+      program_name: temporary_options[:dragonfly_robot_program]
     )
 
-    robot = LiquidRobotFactory.build(model: temporary_options[:robot_model],
-                                    name: op.temporary[:robot_model],
-                                    protocol: self)
-    show_block_2 = []
-    show_block_2.append(robot.turn_on)
-    show_block_2.append(robot.select_program_template(program: program))
-    show_block_2.append(robot.follow_template_instructions)
-    show_block_2.append(wait_for_instrument(instrument_name: robot.model_and_name))
-    show do
-      title 'Set Up and Run Robot'
-      bullet show_block_2.flatten
-    end
+    drgrobot = LiquidRobotFactory.build(
+      model: temporary_options[:dragonfly_robot_model],
+      name: op.temporary[:robot_model],
+      protocol: self
+    )
+
+    display_hash(
+      title: 'Set Up and Run Robot',
+      hash_to_show: use_robot(program: drgprogram,
+                              robot: drgrobot,
+                              items: [composition.input(MASTER_MIX), plate])
+    )
 
     association_map = one_to_one_association_map(from_collection: plate)
     kit.remove_volume(required_reactions)

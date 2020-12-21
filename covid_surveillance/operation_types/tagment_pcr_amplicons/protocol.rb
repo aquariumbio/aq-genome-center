@@ -22,6 +22,8 @@ needs 'Collection Management/CollectionActions'
 
 needs 'PCR Protocols/RunThermocycler'
 
+needs 'Kits/KitContents'
+
 
 class Protocol
   include PlanParams
@@ -40,20 +42,15 @@ class Protocol
   include CollectionActions
   include RunThermocycler
   include CovidSurveillanceHelper
+  include KitContents
 
   COV1 = 'COV1'.freeze
   COV2 = 'COV2'.freeze
 #========== Composition Definitions ==========#
-
-  AREA_SEAL = "Microseal 'B' adhesive seals"
   TAGMENT_KIT = 'Tagment PCR Amplicons Kit'
 
   EBLTS_HT = 'Enrichment BLT HT'
   TB1_HT = 'Tagmentation Buffer 1 HT'
-  WATER = 'Nuclease-free water'
-
-  MICRO_TUBES = '1.7 ml Tube'
-  TEST_TUBE = '15 ml Reagent Tube'
 
   def components
     [
@@ -119,8 +116,10 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    robot_model: TestLiquidHandlingRobot::MODEL,
+    mosquito_robot_program: 'Tagment PCR Amplicons',
+    mosquito_robot_model: Mosquito::MODEL,
+    dragonfly_robot_program: 'TAG_MM',
+    dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                         speed: create_qty(qty: 1600, units: RPM) },
@@ -170,7 +169,7 @@ end
       output_plate = op.output(POOLED_PLATE).collection
 
       retrieve_list = reject_components(
-        list_of_rejections: [POOLED_PLATE, MASTER_MIX],
+        list_of_rejections: [POOLED_PLATE, MASTER_MIX, COV1, COV2],
         components: composition.components
       )
 
@@ -196,7 +195,7 @@ end
 
       show_block_1b = []
       show_block_1b += label_items(
-        objects: [composition.input(MICRO_TUBES).input_name],
+        objects: [composition.input(MICRO_TUBE).input_name],
         labels: [composition.input(MASTER_MIX).item]
       )
 
@@ -209,22 +208,40 @@ end
         note show_block_1b.flatten
       end
 
-      program = LiquidRobotProgramFactory.build(
-        program_name: temporary_options[:robot_program]
+      drgprogram = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program]
       )
 
-      robot = LiquidRobotFactory.build(model: temporary_options[:robot_model],
-                                      name: op.temporary[:robot_model],
-                                      protocol: self)
-      show_block_2 = []
-      show_block_2.append(robot.turn_on)
-      show_block_2.append(robot.select_program_template(program: program))
-      show_block_2.append(robot.follow_template_instructions)
-      show_block_2.append(wait_for_instrument(instrument_name: robot.model_and_name))
-      show do
-        title 'Set Up and Run Robot'
-        bullet show_block_2.flatten
-      end 
+      drgrobot = LiquidRobotFactory.build(
+        model: temporary_options[:dragonfly_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: drgprogram,
+                                robot: drgrobot,
+                                items: [composition.input(MASTER_MIX), output_plate])
+      )
+
+      program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:mosquito_robot_program]
+      )
+
+      robot = LiquidRobotFactory.build(
+        model: temporary_options[:mosquito_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: program,
+                                robot: robot, items: [input_plate1,
+                                                      input_plate2,
+                                                      output_plate])
+      )
 
       association_map = one_to_one_association_map(from_collection: input_plate1)
 

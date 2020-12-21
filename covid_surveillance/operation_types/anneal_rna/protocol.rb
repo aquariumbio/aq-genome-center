@@ -25,6 +25,7 @@ needs 'PCR Protocols/RunThermocycler'
 
 needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
+needs 'Kits/KitContents'
 
 
 class Protocol
@@ -44,6 +45,7 @@ class Protocol
   include RunThermocycler
   include KitHelper
   include CovidSurveillanceHelper
+  include KitContents
 
 ############ Composition Parts ###########
   AREA_SEAL = "Microseal 'B' adhesive seals"
@@ -100,8 +102,10 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    robot_model: TestLiquidHandlingRobot::MODEL,
+    mosquito_robot_program: 'Anneal RNA and FS Synthesis',
+    mosquito_robot_model: Mosquito::MODEL,
+    dragonfly_robot_program: 'EP3_HT',
+    dragonfly_robot_model: Dragonfly::MODEL,
     thermocycler_model: TestThermocycler::MODEL,
     program_name: 'CDC_TaqPath_CG',
     qpcr: true,
@@ -154,7 +158,7 @@ end
         items: reject_components(
                  list_of_rejections: [POOLED_PLATE, CDNA_PLATE],
                  components: composition.components
-              ), #.map(&:input_name),
+              ),
         type: Vortex::NAME
       )
 
@@ -167,27 +171,44 @@ end
       end
       # End Show block 1
 
-      program = LiquidRobotProgramFactory.build(
-        program_name: temporary_options[:robot_program]
+      drgprogram = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program]
       )
 
-      robot = LiquidRobotFactory.build(model: temporary_options[:robot_model],
-                                      name: op.temporary[:robot_model],
-                                      protocol: self)
-      show_block_2 = []
-      show_block_2.append(robot.turn_on)
-      show_block_2.append(robot.select_program_template(program: program))
-      show_block_2.append(robot.follow_template_instructions)
-      show_block_2.append(wait_for_instrument(instrument_name: robot.model_and_name))
-      show do
-        title 'Set Up and Run Robot'
-        bullet show_block_2.flatten
-      end
+      drgrobot = LiquidRobotFactory.build(
+        model: temporary_options[:dragonfly_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: drgprogram,
+                                robot: drgrobot,
+                                items: [composition.input(EPH3_HT), cdna])
+      )
+
+
+      program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:mosquito_robot_program]
+      )
+
+      robot = LiquidRobotFactory.build(
+        model: temporary_options[:mosquito_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: program,
+                                robot: robot, items: [plate, cdna])
+      )
 
       association_map = one_to_one_association_map(from_collection: plate)
       copy_wells(from_collection: plate, 
-                to_collection: cdna,
-                association_map: association_map)
+                 to_collection: cdna,
+                 association_map: association_map)
 
       associate_transfer_collection_to_collection(
         from_collection: plate,

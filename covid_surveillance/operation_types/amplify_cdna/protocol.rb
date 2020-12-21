@@ -24,7 +24,7 @@ needs 'PCR Protocols/RunThermocycler'
 
 needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
-
+needs 'Kits/KitContents'
 
 class Protocol
   include PlanParams
@@ -44,19 +44,11 @@ class Protocol
   include RunThermocycler
   include KitHelper
   include CovidSurveillanceHelper
+  include KitContents
 
 # ============= Composition Definitions -==============#
 
-  AREA_SEAL = "Microseal 'B' adhesive seals"
   AMPLIFY_KIT = 'Amplify cDNA Kit'
-
-  IPM_HT = 'Illumina PCR Mix HT'
-  CPP1_HT = 'COVIDSeq Primer Pool 1 HT'
-  CPP2_HT = 'COVIDSeq Primer Pool 2 HT'
-  WATER = 'Nuclease-free water'
-
-
-  TEST_TUBE = '15 ml Reagent Tube'
 
   MASTER_MIX_2 = 'Master Mix 2'
 
@@ -136,8 +128,11 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    robot_model: TestLiquidHandlingRobot::MODEL,
+    mosquito_robot_program: 'Amplify CDNA',
+    mosquito_robot_model: Mosquito::MODEL,
+    dragonfly_robot_program: 'PCR 1 MM',
+    dragonfly_robot_program2: 'PCR 2 MM',
+    dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                         speed: create_qty(qty: 1600, units: RPM) },
@@ -191,7 +186,8 @@ COV2 = 'COV2'.freeze
       plate2 = composition.input(COV2).item
 
       retrieve_list = reject_components(
-        list_of_rejections: [COV1, COV2, MASTER_MIX, MASTER_MIX_2],
+        list_of_rejections: [POOLED_PLATE, COV1, COV2,
+                             MASTER_MIX, MASTER_MIX_2],
         components: composition.components
       )
       show_retrieve_parts(retrieve_list + composition.consumables)
@@ -205,11 +201,11 @@ COV2 = 'COV2'.freeze
                             type: Vortex::NAME)
 
       adj_multiplier = plate1.get_non_empty.length
-      mm_components_1 = [composition.input('IPM_HT'),
-                         composition.input('CPP1_HT'),
+      mm_components_1 = [composition.input(IPM_HT),
+                         composition.input(CPP1_HT),
                          composition.input(WATER)]
-      mm_components_2 = [composition.input('IPM_HT'),
-                         composition.input('CPP2_HT'),
+      mm_components_2 = [composition.input(IPM_HT),
+                         composition.input(CPP2_HT),
                          composition.input(WATER)]
 
       show_block_1b = master_mix_handler(components: mm_components_1,
@@ -231,32 +227,61 @@ COV2 = 'COV2'.freeze
         note show_block_1c.flatten
       end
 
-      program = LiquidRobotProgramFactory.build(
-        program_name: temporary_options[:robot_program]
+      drgprogram = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program]
+      )
+      drgprogram2 = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program2]
       )
 
-      robot = LiquidRobotFactory.build(model: temporary_options[:robot_model],
-                                      name: op.temporary[:robot_model],
-                                      protocol: self)
-      show_block_2 = []
-      show_block_2.append(robot.turn_on)
-      show_block_2.append(robot.select_program_template(program: program))
-      show_block_2.append(robot.follow_template_instructions)
-      show_block_2.append(wait_for_instrument(instrument_name: robot.model_and_name))
-      show do
-        title 'Set Up and Run Robot'
-        bullet show_block_2.flatten
-      end
+      drgrobot = LiquidRobotFactory.build(
+        model: temporary_options[:dragonfly_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: drgprogram,
+                                robot: drgrobot,
+                                items: [plate1,
+                                        composition.input(MASTER_MIX)])
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: drgprogram2,
+                                robot: drgrobot,
+                                items: [plate2,
+                                        composition.input(MASTER_MIX_2)])
+      )
+
+      program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:mosquito_robot_program]
+      )
+
+      robot = LiquidRobotFactory.build(
+        model: temporary_options[:mosquito_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      display_hash(
+        title: 'Set Up and Run Robot',
+        hash_to_show: use_robot(program: program,
+                                robot: robot, items: [input_plate,
+                                                      plate1, plate2])
+      )
 
       association_map = one_to_one_association_map(from_collection: input_plate)
 
       copy_wells(from_collection: input_plate,
-                to_collection: plate1,
-                association_map: association_map)
+                 to_collection: plate1,
+                 association_map: association_map)
 
       copy_wells(from_collection: input_plate,
-                to_collection: plate2,
-                association_map: association_map)
+                 to_collection: plate2,
+                 association_map: association_map)
 
       associate_transfer_item_to_collection(
         from_item: composition.input(MASTER_MIX).item,

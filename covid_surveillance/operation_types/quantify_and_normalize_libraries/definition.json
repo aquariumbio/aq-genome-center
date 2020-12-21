@@ -4,7 +4,7 @@
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "Pooled LIbrary",
+      "name": "Pooled Library",
       "part": false,
       "array": false,
       "routing": "P"
@@ -21,7 +21,7 @@
       "name": "Pooled Library",
       "part": false,
       "array": false,
-      "routing": "P"
+      "routing": "Pp"
     }
   ],
   "on_the_fly": false,

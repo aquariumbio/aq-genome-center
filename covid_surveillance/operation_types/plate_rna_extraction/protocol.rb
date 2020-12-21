@@ -212,7 +212,7 @@ class Protocol
     )
 
     operations.make
-    set_up_test(operations)
+    set_up_test(operations) if debug
 
     operations.each do |op|
       composition = CompositionFactory.build(components: components,
