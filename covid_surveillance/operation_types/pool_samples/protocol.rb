@@ -62,7 +62,7 @@ class Protocol
         pooling_groups: pooling_groups
       )
 
-      inspect_first_three(microtiter_plate.collection)
+      inspect_first_three(microtiter_plate.collection) if debug
 
       # ops.each do |op|
       #   pool_manually(operation: op,
@@ -74,6 +74,12 @@ class Protocol
                   location: @job_params[:plate_location])
     end
 
+    rval = {}
+    rval.merge(test_provenance(operations: operations)) if debug
+    rval
+  end
+
+  def test_provenance(operations:)
     {}
   end
 end
