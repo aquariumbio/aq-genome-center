@@ -1,16 +1,16 @@
-# frozen_string_literal: true
+needs 'Covid Surveillance/PoolingDefinitions'
+needs 'Covid Surveillance/PoolingMethods'
 
 module PoolingHelper
-  def create_pooling_groups(items:, pool_size:, pooling_method:)
-    case pooling_method
-    when 'By ID'
-      items.sort_by(&:id).reverse.each_slice(pool_size).to_a
-    when 'By Name', 'By Batch'
-      items.sort_by { |i| i.sample.name }.each_slice(pool_size).to_a
-    when 'Random'
-      items.shuffle.each_slice(pool_size).to_a
-    else
-      raise 'Invalid pooling method'
-    end
+  include PoolingDefinitions
+  include PoolingMethods
+  def create_pooling_groups(items:, pooling_method:)
+    pooling_details = POOLING_SCHEME[pooling_method]
+    raise 'Invalid pooling method' if pooling_details.nil?
+
+    send(pooling_details[:pooling_schema],
+         size: pooling_details[:pooling_size],
+         items: items)
   end
+
 end

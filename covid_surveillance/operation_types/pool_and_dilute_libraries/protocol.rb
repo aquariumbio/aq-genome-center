@@ -70,6 +70,7 @@ end
       default_job_params: default_job_params,
       default_operation_params: default_operation_params
     )
+
     unless valid_operations(operations)
       bounce_ops(operations)
       return {}
@@ -83,6 +84,8 @@ end
   def valid_operations(operations)
     return false if operations.length > 4
     warn_number_of_ops(operations.length) unless operations.length == 4
+
+
   end
 
   def warn_number_of_ops(num_ops)
@@ -104,6 +107,15 @@ end
       op.error('incompatible index adapters')
       op.status = 'pending'
       op.save
+    end
+  end
+
+  def set_up_test(ops)
+    ops.each do |op|
+      sample = op.input().part.sample
+      plate = op.input(nam).collection
+      samples = Array.new(plate.get_empty.length, sample)
+      plate.add_samples(samples)
     end
   end
 

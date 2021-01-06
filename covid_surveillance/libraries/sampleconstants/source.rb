@@ -11,5 +11,8 @@ module SampleConstants
   POOLED_LIB = 'Pooled Library'.freeze
 
   MASTER_MIX = 'Master Mix'.freeze
-  PLATE_OBJECT_TYPE = '96-Well Plate'.freeze
+
+  PLATE = '384 Well Plate'.freeze
+  PLATE96 = '96-Well Plate'.freeze
+
 end

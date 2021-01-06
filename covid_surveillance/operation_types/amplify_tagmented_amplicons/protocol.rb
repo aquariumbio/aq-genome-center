@@ -11,6 +11,7 @@ needs 'Small Instruments/Shakers'
 needs 'Standard Libs/Units'
 needs 'Covid Surveillance/SampleConstants'
 needs 'Covid Surveillance/AssociationKeys'
+needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'CompositionLibs/AbstractComposition'
@@ -21,6 +22,11 @@ needs 'Collection Management/CollectionActions'
 
 needs 'PCR Protocols/RunThermocycler'
 
+needs 'Kits/KitContents'
+
+needs 'ConsumableLibs/Consumables'
+
+needs 'ConsumableLibs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -38,19 +44,13 @@ class Protocol
   include CollectionTransfer
   include CollectionActions
   include RunThermocycler
+  include CovidSurveillanceHelper
+  include KitContents
+  include ConsumableDefinitions
 
-
-#========== Composition Definitions ==========#
-
-  AREA_SEAL = "Microseal 'B' adhesive seals"
+ #========== Composition Definitions ==========#
   AMP_TAG_KIT = 'Amplify Tagmented Amplicons Kit'
-
-  EPM_HT = 'Enhanced PCR Mix HT'
   IDT_PLATE = 'Index Adapter'
-  WATER = 'Nuclease-free water'
-
-  TEST_TUBE = '15 ml Reagent Tube'
-
   SPARE_PLATE = '96 Well Plate'
 
   def components
@@ -59,7 +59,7 @@ class Protocol
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: '96-Well Plate'
+         object_type: PLATE_384_WELL
        },
        {
          input_name: WATER,
@@ -77,52 +77,28 @@ class Protocol
         input_name: IDT_PLATE,
         qty: 10, units: MICROLITERS,
         sample_name: IDT_PLATE,
-        object_type: '96-Well Plate'
+        object_type: PLATE_384_WELL
       }
     ]
   end
 
-  def consumables
+  def consumable_data
     [
       {
-        input_name: AREA_SEAL,
-        qty: 1, units: 'Each',
-        description: 'Adhesive Plate Seal'
+        consumable: CONSUMABLES[AREA_SEAL],
+        qty: 1, units: 'Each'
       },
       {
-        input_name: SPARE_PLATE,
-        qty: 1, units: 'Each',
-        description: '96 Well PCR Plate'
+        consumable: CONSUMABLES[SPARE_PLATE],
+        qty: 1, units: 'Each'
       },
       {
-        input_name: 'pipet_tip_100',
-        qty: 2, units: 'Box',
-        description: '100 ul Pipet Tips'
+        consumable: CONSUMABLES[TIP_BOX_100],
+        qty: 2, units: 'Each'
       },
       {
-        input_name: TEST_TUBE,
-        qty: 1, units: 'Tubes',
-        description: '15 ml Tube'
-      }
-    ]
-  end
-
-  def kits
-    [
-      {
-        input_name: AMP_TAG_KIT,
-        qty: 1, units: 'kits',
-        description: 'Kit for amplifying tagmented amplicons',
-        location: 'M80 Freezer',
-        components: [
-          {
-            input_name: EPM_HT,
-            qty: 24, units: MICROLITERS,
-            sample_name: EPM_HT,
-            object_type: 'Reagent Bottle'
-          }
-        ],
-        consumables: []
+        consumable: CONSUMABLES[TEST_TUBE],
+        qty: 1, units: 'Tubes'
       }
     ]
   end
@@ -147,8 +123,12 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    instrument_model: TestLiquidHandlingRobot::MODEL,
+    mosquito_remove_robot_program: 'Amplify Tagmented Amplicons',
+    transfer_index_program: 'Amplify Tagmented Amplicons Index Plate',
+    mosquito_transfer_index_program: 'PCR_MM',
+    mosquito_robot_model: Mosquito::MODEL,
+    dragonfly_robot_program: 'EP3_HT',
+    dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                          speed: create_qty(qty: 1600, units: RPM) },
@@ -172,56 +152,32 @@ end
       default_operation_params: default_operation_params
     )
 
-    paired_ops = pair_ops_with_instruments(operations: operations,
-                                           instrument_key: LIQUID_ROBOT_PARAM)
-
-    remove_unpaired_operations(operations - paired_ops)
-
-    paired_ops.each do |op|
+    operations.each do |op|
       set_up_test(op) if debug
-      op.input(IDT_PLATE).collection.associate(INDEX_KEY, [1,2,3,4].sample) if debug
       op.pass(POOLED_PLATE)
-
-      date = DateTime.now.strftime('%Y-%m-%d')
-      file_name = "#{date}_Op_#{op.id}_Plate_#{op.output(POOLED_PLATE).collection.id}"
 
       temporary_options = op.temporary[:options]
 
-      composition = CompositionFactory.build(components: components,
-                                             consumables: consumables,
-                                             kits: kits)
 
-      program = LiquidRobotProgramFactory.build(
-        program_name: temporary_options[:robot_program]
+      composition, consumables, _kit_ = setup_kit_composition(
+        kit_sample_name: AMP_TAG_KIT,
+        num_reactions_required: op.input(POOLED_PLATE).collection.parts.length,
+        components: components,
+        consumables: consumable_data
       )
-
-      robot = LiquidRobotFactory.build(model: temporary_options[:instrument_model],
-                                       name: op.temporary[INSTRUMENT_NAME],
-                                       protocol: self)
-
-      unless check_robot_compatibility(input_object: op.input(POOLED_PLATE).collection,
-                                       robot: robot,
-                                       program: program)
-        remove_unpaired_operations([op])
-        next
-      end
-
-      kit = composition.input(AMP_TAG_KIT)
 
       composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
       composition.input(IDT_PLATE).item = op.input(IDT_PLATE).collection
 
       plate = composition.input(POOLED_PLATE).item
-      op.pass(POOLED_PLATE)
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
         object_type: composition.input(WATER).object_type
       )
-      composition.make_kit_component_items
 
       mm = composition.input(MASTER_MIX)
       adj_multi = plate.get_non_empty.length
-      mm_components = [composition.input(AMP_TAG_KIT).input(EPM_HT),
+      mm_components = [composition.input(EPM_HT),
                        composition.input(WATER)]
 
       adjust_volume(components: mm_components,
@@ -230,56 +186,78 @@ end
       mm.item = make_item(sample: mm.sample,
                           object_type: mm.object_type)
 
-      composition.input(WATER).item = find_random_item(
-        sample: composition.input(WATER).sample,
-        object_type: composition.input(WATER).object_type
+      retrieve_list = reject_components(
+        list_of_rejections: [MASTER_MIX, POOLED_PLATE],
+        components: composition.components
+      )
+      show_retrieve_parts(retrieve_list + consumables.consumables)
+
+      vortex_list = reject_components(
+        list_of_rejections: [WATER, IDT_PLATE],
+        components: retrieve_list
+      )
+      show_block_1 = []
+      show_block_1.append(
+        { display: shake(items: vortex_list,
+                         type: Vortex::NAME),
+          type: 'note' }
       )
 
-      show_retrieve_components(
-        [composition.input(POOLED_PLATE), composition.input(WATER)]
+      adj_multiplier = plate.get_non_empty.length
+      mm_components = [composition.input(EPM_HT), composition.input(WATER)]
+
+      show_block_1.append({
+        display: master_mix_handler(components: mm_components,
+                                    mm: composition.input(MASTER_MIX),
+                                    adjustment_multiplier: adj_multiplier,
+                                    mm_container: composition.input(TEST_TUBE)),
+        type: 'note'
+      })
+
+      show_block_1.append({ display: place_on_magnet(plate), type: 'note' })
+
+      mosquito_robot = LiquidRobotFactory.build(
+        model: temporary_options[:mosquito_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
       )
 
-      show_retrieve_consumables(composition.consumables)
-      show_retrieve_kits(composition.kits)
+      drgrobot = LiquidRobotFactory.build(
+        model: temporary_options[:dragonfly_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
 
-      show_get_plate_index_id(plate: composition.input(IDT_PLATE).item,
-                              key: INDEX_KEY)
+      remove_supernatant_program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:mosquito_remove_robot_program]
+      )
 
-      label_items(objects: [composition.input(TEST_TUBE).input_name],
-                  labels: [mm.item])
+      show_block_1.append(
+        use_robot(program: remove_supernatant_program,
+                  robot: mosquito_robot,
+                  items: [plate])
+      )
 
-      show_thaw_items(kit.composition.components.map(&:input_name))
+      add_mm_program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program]
+      )
 
-      vortex_objs(kit.composition.components.map(&:input_name))
+      show_block_1.append(
+        use_robot(program: add_mm_program,
+                  robot: drgrobot,
+                  items: [plate, composition.input(MASTER_MIX)])
+      )
 
 
-      create_master_mix(components: mm_components,
-                        master_mix_item: mm.item,
-                        adj_qty: true)
+      index_transfer_program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:mosquito_transfer_index_program]
+      )
 
-      open_index_adapter_plate(index_plate: composition.input(IDT_PLATE),
-                               pcr_plate: composition.input(SPARE_PLATE))
-
-      place_on_magnet(plate)
-
-      remove_discard_supernatant([plate])
-
-      remove_from_magnet(plate)
-
-      robot.turn_on
-
-      go_to_instrument(instrument_name: robot.model_and_name)
-
-      robot.select_program_template(program: program)
-
-      robot.save_run(path: program.run_file_path, file_name: file_name)
-
-      robot.follow_template_instructions
-
-      wait_for_instrument(instrument_name: robot.model_and_name)
-
-      robot.remove_item(item: plate)
-
+      show_block_1.append(
+        use_robot(program: index_transfer_program,
+                  robot: mosquito_robot,
+                  items: [plate, composition.input(IDT_PLATE)])
+      )
       association_map = one_to_one_association_map(from_collection: plate)
 
       associate_transfer_item_to_collection(
@@ -296,89 +274,86 @@ end
         transfer_vol: composition.input(IDT_PLATE).volume_hash
       )
 
-      plate.associate(INDEX_KEY, composition.input(IDT_PLATE).item.get(INDEX_KEY))
+      transfer_adapter_index(from_plate: plate,
+                             to_plate: composition.input(IDT_PLATE).item)
 
-      seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
+      show_block_2 = []
+      show_block_2.append(
+        {
+          display: seal_plate(
+            [plate], seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
 
-      shake(items: [plate],
+      show_block_2.append(
+        {
+          display: shake(
+            items: [plate],
             speed: temporary_options[:shaker_parameters][:speed],
-            time: temporary_options[:shaker_parameters][:time])
+            time: temporary_options[:shaker_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
 
-      spin_down(items: [plate],
-                speed: temporary_options[:centrifuge_parameters][:speed],
-                time: temporary_options[:centrifuge_parameters][:time])
+      show_block_2.append(
+        {
+          display: spin_down(
+            items: [plate],
+            speed: temporary_options[:centrifuge_parameters][:speed],
+            time: temporary_options[:centrifuge_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
 
-      pipet_up_and_down(plate)
+      show_block_2.append(
+        {
+          display: pipet_up_and_down(plate),
+          type: 'note'
+        }
+      )
+
+      display_hash(
+        title: 'Prep and Run Robot',
+        hash_to_show: show_block_1
+      )
+
+      display_hash(
+        title: 'Prepare for Thermocycler',
+        hash_to_show: show_block_2
+      )
+
+      run_qpcr(op: op,
+               plates: [plate])
     end
-
-    run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
     {}
+
   end
 
-  # Instruction to pipet up and down to mix
-  #
-  # @param plate [Collection]
-  def pipet_up_and_down(plate)
-    show do
-      title 'Pipet up and down to Mix'
-      note 'Set Pipet to 35 ul'
-      note "Pipet up and down to mix all wells of plate #{plate}"
+  def transfer_adapter_index(from_plate:, to_plate:)
+    from_plate.parts.zip(to_plate.parts).each do |from, to|
+      skip if from.nil? || to.nil?
+      to_plate.associate(INDEX_KEY, from.get(INDEX_KEY))
     end
-  end
-
-  # Instructions to place plate on some magnets
-  #
-  # @param plate [Collection]
-  def place_on_magnet(plate)
-    show do
-      title 'Place on Magnetic Stand'
-      note "Put plate #{plate} on magnetic stan"
-      note 'Keep on magnet for the next few steps'
-    end
-  end
-
-  # Instructions to remove plate from magnet
-  #
-  # @param plate [Collection]
-  def remove_from_magnet(plate)
-    show do
-      title 'Remove from Magnetic Stand'
-      note "Remove plate #{plate} from magnetic stan"
-    end
-  end
-
-  # Instructions on how to open index plate
-  #
-  # @param index_plate [Component] Tee plate to be opened
-  # @param pcr_plate [Consumable] Plate to help open index plate
-  def open_index_adapter_plate(index_plate:, pcr_plate:)
-    show do
-      title 'Open Index Adapter Plate'
-      note "Align a new #{pcr_plate.input_name} above index plate #{index_plate.input_name} and press down to puncture the foil seal"
-      note "Discard #{pcr_plate.input_name}"
-    end
-  end
-
-  def show_get_plate_index_id(plate:, key:)
-    responses = show do
-      title 'Record Index Adapter Set'
-      note "Please note Illumina-PCR Indexes Set for plate #{plate} (1, 2, 3, 4)"
-      get('number',
-        var: 'set',
-        label: 'Index Set',
-        default: 1)
-      end
-    plate.associate(key,
-                    debug ? rand(4) : responses.get_responses('set'))
   end
 
   def set_up_test(op)
-    [POOLED_PLATE, IDT_PLATE].each do |nam|
-      sample = op.input(nam).part.sample
-      plate = op.input(nam).collection
-      samples = Array.new(plate.get_empty.length, sample)
-      plate.add_samples(samples)
+    sample = op.input(POOLED_PLATE).part.sample
+    plate = op.input(POOLED_PLATE).collection
+    samples = Array.new(plate.get_empty.length, sample)
+    plate.add_samples(samples)
+
+    sample = op.input(IDT_PLATE).part.sample
+    plate = op.input(IDT_PLATE).collection
+    samples = Array.new(plate.get_empty.length, sample)
+    plate.add_samples(samples)
+
+    op.input(IDT_PLATE).collection.parts.each do |part|
+      part.associate(INDEX_KEY, [1,2,3,4].sample)
     end
   end
 

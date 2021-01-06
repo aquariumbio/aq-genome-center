@@ -1,11 +1,10 @@
 {
-  "id": 17,
   "name": "Quantify and Normalize Libraries",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "Pooled LIbrary",
+      "name": "Pooled Library",
       "part": false,
       "array": false,
       "routing": "P"
@@ -22,7 +21,7 @@
       "name": "Pooled Library",
       "part": false,
       "array": false,
-      "routing": "P"
+      "routing": "Pp"
     }
   ],
   "on_the_fly": false,
