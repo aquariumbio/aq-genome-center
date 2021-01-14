@@ -15,8 +15,8 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/AbstractComposition'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
 needs 'Collection Management/CollectionTransfer'
@@ -27,9 +27,9 @@ needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
+needs 'Consumable Libs/Consumables'
 
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 
 class Protocol
