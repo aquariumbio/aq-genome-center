@@ -11,6 +11,7 @@ needs 'Small Instruments/Shakers'
 needs 'Standard Libs/Units'
 needs 'Covid Surveillance/SampleConstants'
 needs 'Covid Surveillance/AssociationKeys'
+needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'CompositionLibs/AbstractComposition'
@@ -21,6 +22,11 @@ needs 'Collection Management/CollectionActions'
 
 needs 'PCR Protocols/RunThermocycler'
 
+needs 'Kits/KitContents'
+
+needs 'ConsumableLibs/Consumables'
+
+needs 'ConsumableLibs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -38,17 +44,13 @@ class Protocol
   include CollectionTransfer
   include CollectionActions
   include RunThermocycler
-
+  include CovidSurveillanceHelper
+  include KitContents
+  include ConsumableDefinitions
 
 #========== Composition Definitions ==========#
-
-  AREA_SEAL = "Microseal 'B' adhesive seals"
   POST_TAG_KIT = 'Post Tagmentation Clean Up Kit'
 
-  ST2_HT = 'Stop Tagment Buffer 2 HT'
-  TWB_HT = 'Tagmentation Wash Buffer HT'
-
-  MICRO_TUBES = '1.7 ml Tube'
 
   def components
     [ 
@@ -56,48 +58,16 @@ class Protocol
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: '96-Well Plate'
+         object_type: PLATE_384_WELL
        }
     ]
   end
 
-  def consumables
+  def consumable_data
     [
       {
-        input_name: AREA_SEAL,
-        qty: 1, units: 'Each',
-        description: 'Adhesive Plate Seal'
-      },
-      {
-        input_name: 'pipet_tip_100',
-        qty: 2, units: 'Box',
-        description: '100 ul Pipet Tips'
-      }
-    ]
-  end
-
-  def kits
-    [
-      {
-        input_name: POST_TAG_KIT,
-        qty: 1, units: 'kits',
-        description: 'Kit for synthesizing first strand cDNA',
-        location: 'M80 Freezer',
-        components: [
-          {
-            input_name: ST2_HT,
-            qty: 10, units: MICROLITERS,
-            sample_name: ST2_HT,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: TWB_HT,
-            qty: 100, units: MICROLITERS,
-            sample_name: TWB_HT,
-            object_type: 'Reagent Bottle'
-          }
-        ],
-        consumables: []
+        consumable: CONSUMABLES[AREA_SEAL],
+        qty: 1, units: 'Each'
       }
     ]
   end
@@ -122,13 +92,16 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    instrument_model: TestLiquidHandlingRobot::MODEL,
+    mosquito_robot_program: 'Post Tagmentation Clean Up',
+    mosquito_robot_model: Mosquito::MODEL,
+    dragonfly_robot_program: 'TWB_HT',
+    dragonfly_robot_program2: 'ST2_HT',
+    dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                        speed: create_qty(qty: 1600, units: RPM) },
+                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 500, units: TIMES_G) },
+                             speed: create_qty(qty: 500, units: TIMES_G) },
     incubation_params: { time: create_qty(qty: 5, units: MINUTES),
                          temperature: create_qty(qty: 'room temperature',
                                                  units: '') },
@@ -140,157 +113,267 @@ end
 
 ########## MAIN ##########
 
-def main
-  @job_params = update_all_params(
-    operations: operations,
-    default_job_params: default_job_params,
-    default_operation_params: default_operation_params
-  )
-
-  paired_ops = pair_ops_with_instruments(operations: operations,
-                                         instrument_key: LIQUID_ROBOT_PARAM)
-
-  remove_unpaired_operations(operations - paired_ops)
-
-  paired_ops.each do |op|
-    set_up_test(op) if debug
-    temporary_options = op.temporary[:options]
-
-    composition = CompositionFactory.build(components: components,
-                                           consumables: consumables,
-                                           kits: kits)
-
-    composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
-    plate = composition.input(POOLED_PLATE).item
-    op.pass(POOLED_PLATE)
-
-    show_get_composition(composition: composition)
-
-    retrieve_materials([plate])
-
-    vortex_objs(composition.kits.map { |kit|
-      kit.composition.components.map(&:input_name)
-    }.flatten)
-
-    composition.make_kit_component_items
-
-    association_map = one_to_one_association_map(from_collection: plate)
-    kit = composition.input(POST_TAG_KIT)
-
-    spin_down(items: [plate],
-              speed: temporary_options[:centrifuge_parameters][:speed],
-              time: temporary_options[:centrifuge_parameters][:time])
-
-    multichannel_item_to_collection(to_collection: plate,
-                                    source: kit.input(ST2_HT).item,
-                                    volume: kit.input(ST2_HT).volume_hash,
-                                    association_map: association_map,
-                                    verbose: false)
-
-    associate_transfer_item_to_collection(
-      from_item: kit.input(ST2_HT).item,
-      to_collection: plate,
-      association_map: association_map,
-      transfer_vol: kit.input(ST2_HT).volume_hash
+  def main
+    @job_params = update_all_params(
+      operations: operations,
+      default_job_params: default_job_params,
+      default_operation_params: default_operation_params
     )
 
-    seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
+    operations.each do |op|
+      set_up_test(op) if debug
+      op.pass(POOLED_PLATE)
 
-    shake(items: [plate],
-          speed: temporary_options[:shaker_parameters][:speed],
-          time: temporary_options[:shaker_parameters][:time])
+      required_reactions = create_qty(qty: op.input(POOLED_PLATE).collection.parts.length,
+                                      units: 'rxn')
 
-    show_incubate_items(
-      items: [plate],
-      time: temporary_options[:incubation_params][:time],
-      temperature: temporary_options[:incubation_params][:temperature]
-    )
+      temporary_options = op.temporary[:options]
 
-    spin_down(items: [plate],
-              speed: temporary_options[:centrifuge_parameters][:speed],
-              time: temporary_options[:centrifuge_parameters][:time])
+      composition, consumables, _kit_ = setup_kit_composition(
+        kit_sample_name: POST_TAG_KIT,
+        num_reactions_required: required_reactions,
+        components: components,
+        consumables: consumable_data
+      )
 
-    place_on_magnet(plate)
+      composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
+      plate = composition.input(POOLED_PLATE).item
 
-    if show_inspect_for_bubbles(plate)
-      spin_down(items: [plate],
-                speed: temporary_options[:centrifuge_parameters][:speed],
-                time: temporary_options[:centrifuge_parameters][:time])
+      show_retrieve_parts(composition.components + consumables.consumables)
+
+      vortex_list = reject_components(
+        list_of_rejections: [POOLED_PLATE],
+        components: composition.components
+      )
+
+
+      show_block_1 = []
+
+      show_block_1.append(
+        {
+          display: seal_plate(
+            [plate], seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_1.append(
+        {
+          display: shake(items: vortex_list,
+                         type: Vortex::NAME),
+          type: 'note'
+        }
+      )
+
+      show_block_1.append(
+        { 
+          display: spin_down(
+            items: [plate],
+            speed: temporary_options[:centrifuge_parameters][:speed],
+            time: temporary_options[:centrifuge_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
+
+      association_map = one_to_one_association_map(from_collection: plate)
+
+      drgprogram = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program]
+      )
+
+      drgprogram2 = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:dragonfly_robot_program2]
+      )
+
+      drgrobot = LiquidRobotFactory.build(
+        model: temporary_options[:dragonfly_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      program = LiquidRobotProgramFactory.build(
+        program_name: temporary_options[:mosquito_robot_program]
+      )
+
+      robot = LiquidRobotFactory.build(
+        model: temporary_options[:mosquito_robot_model],
+        name: op.temporary[:robot_model],
+        protocol: self
+      )
+
+      show_block_1.append(
+        use_robot(program: drgprogram,
+                  robot: drgrobot, items: [plate, composition.input(ST2_HT)])
+      )
+
+      associate_transfer_item_to_collection(
+        from_item: composition.input(ST2_HT).item,
+        to_collection: plate,
+        association_map: association_map,
+        transfer_vol: composition.input(ST2_HT).volume_hash
+      )
+
+      show_block_2 = []
+
+      show_block_2.append(
+        {
+          display: seal_plate(
+            [plate], seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_1.append(
+        {
+          display: shake(items: vortex_list,
+                         type: Vortex::NAME),
+          type: 'note'
+        }
+      )
+
+      show_block_2.append(
+        {
+          display: show_incubate_items(
+            items: [plate],
+            time: temporary_options[:incubation_params][:time],
+            temperature: temporary_options[:incubation_params][:temperature]
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_2.append(
+        { 
+          display: spin_down(
+            items: [plate],
+            speed: temporary_options[:centrifuge_parameters][:speed],
+            time: temporary_options[:centrifuge_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_2.append(
+        {display: place_on_magnet(plate),
+         type: 'note'})
+
+      show_block_2.append( 
+        use_robot(program: program,
+          robot: robot,
+          items: [plate])
+      )
+
+      show_block_3 = []
+      show_block_3.append(use_robot(program: drgprogram2,
+                                robot: drgrobot,
+                                items: [plate, composition.input(TWB_HT)]))
+
+      associate_transfer_item_to_collection(
+        from_item: composition.input(TWB_HT).item,
+        to_collection: plate,
+        association_map: association_map,
+        transfer_vol: composition.input(TWB_HT).volume_hash
+      )
+
+      show_block_3.append(
+        {
+          display: seal_plate(
+            [plate], seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_3.append(
+        {
+          display: shake(items: vortex_list,
+                         type: Vortex::NAME),
+          type: 'note'
+        }
+      )
+
+      show_block_3.append(
+        { 
+          display: spin_down(
+            items: [plate],
+            speed: temporary_options[:centrifuge_parameters][:speed],
+            time: temporary_options[:centrifuge_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_3.append({ display: place_on_magnet(plate),
+                           type: 'note' })
+
+      show_block_2.append( 
+        use_robot(program: program,
+          robot: robot,
+          items: [plate])
+      )
+
+      show_block_4 = []
+      show_block_4.append(use_robot(
+        program: drgprogram2,
+        robot: drgrobot,
+        items: [plate, composition.input(TWB_HT)]
+      ))
+
+      associate_transfer_item_to_collection(
+        from_item: composition.input(TWB_HT).item,
+        to_collection: plate,
+        association_map: association_map,
+        transfer_vol: composition.input(TWB_HT).volume_hash
+      )
+
+      show_block_4.append(
+        {
+          display: seal_plate(
+            [plate], seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_4.append(
+        {
+          display: shake(items: vortex_list,
+                         type: Vortex::NAME),
+          type: 'note'
+        }
+      )
+
+      show_block_4.append(
+        { 
+          display: spin_down(
+            items: [plate],
+            speed: temporary_options[:centrifuge_parameters][:speed],
+            time: temporary_options[:centrifuge_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_4.append({ display: place_on_magnet(plate),
+        type: 'note' })
+
+      display_hash(title: 'Perform the following steps',
+                   hash_to_show: show_block_1)
+      display_hash(title: 'Perform the following steps',
+                   hash_to_show: show_block_2)
+      display_hash(title: 'Perform the following steps',
+                   hash_to_show: show_block_3)
+      display_hash(title: 'Perform the following steps',
+                   hash_to_show: show_block_4)
+      run_qpcr(op: op,
+               plates: [plate])
     end
 
-    remove_discard_supernatant([plate])
+    {}
 
-    multichannel_item_to_collection(to_collection: plate,
-                                    source: kit.input(TWB_HT).item,
-                                    volume: kit.input(TWB_HT).volume_hash,
-                                    association_map: association_map,
-                                    verbose: false)
-
-    seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
-
-    shake(items: [plate],
-          speed: temporary_options[:shaker_parameters][:speed],
-          time: temporary_options[:shaker_parameters][:time])
-
-    spin_down(items: [plate],
-              speed: temporary_options[:centrifuge_parameters][:speed],
-              time: temporary_options[:centrifuge_parameters][:time])
-
-    place_on_magnet(plate)
-
-    remove_discard_supernatant([plate])
-
-    multichannel_item_to_collection(to_collection: plate,
-                                    source: kit.input(TWB_HT).item,
-                                    volume: kit.input(TWB_HT).volume_hash,
-                                    association_map: association_map,
-                                    verbose: false)
-
-    associate_transfer_item_to_collection(
-      from_item: kit.input(TWB_HT).item,
-      to_collection: plate,
-      association_map: association_map,
-      transfer_vol: kit.input(TWB_HT).volume_hash
-    )
-
-    seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
-
-    shake(items: [plate],
-          speed: temporary_options[:shaker_parameters][:speed],
-          time: temporary_options[:shaker_parameters][:time])
-
-    spin_down(items: [plate],
-              speed: temporary_options[:centrifuge_parameters][:speed],
-              time: temporary_options[:centrifuge_parameters][:time])
-
-    place_on_magnet(plate)
-
-  end
-
-  run_qpcr(operations: operations, item_key: POOLED_PLATE)
-
-  {}
-
-end
-
-  # Instructions to place plate on some magnets
-  #
-  # @param plate [Item]
-  def place_on_magnet(plate)
-    show do
-      title 'Place on Magnetic Stand'
-      note "Put plate #{plate} on magnetic stand and wait until clear (~3 Min)"
-    end
-  end
-
-  # Instructions to remove from magnetic plate
-  #
-  # @param plate [Item]
-  def remove_from_magnet(plate)
-    show do
-      title 'Remove from Magnetic Stand'
-      note "Put plate #{plate} on magnetic stand and wait until clear (~3 Min)"
-    end
   end
 
   def set_up_test(op)

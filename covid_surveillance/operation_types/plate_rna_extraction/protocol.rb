@@ -19,6 +19,14 @@ needs 'CompositionLibs/CompositionHelper'
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
 
+needs 'Container/KitHelper'
+needs 'Kits/KitContents'
+
+needs 'ConsumableLibs/Consumables'
+needs 'ConsumableLibs/ConsumableDefinitions'
+
+needs 'Covid Surveillance/CovidSurveillanceHelper'
+
 
 class Protocol
   include PlanParams
@@ -35,31 +43,22 @@ class Protocol
   include CompositionHelper
   include CollectionTransfer
   include CollectionActions
+  include KitHelper
+  include KitContents
+  include CovidSurveillanceHelper
+
 
   # ============= Composition Definitions ==============#
   EXTRACTION_KIT = 'QiAmp 96 Viral RNA Kit'
 
-  AREA_SEAL = "AirPore Tape Sheet"
-  TAPE_PAD = 'Tape Pad'
-
   ETHANOL = 'Absolute ethanol'
-
-  DEEP_WELL_PLATE = '96 Well Deepwell Plate 2 ml'
-  QIAAMP_PLATE = 'QIAamp 96 Plate'
-
-  AVL = 'Buffer AVL'
-  AW1 = 'Buffer AW1'
-  AW2 = 'Buffer AW2'
-  AVE = 'Buffer AVE'
-  CARRIER = 'Carrier RNA'
-  ELUTE = 'TopElute Fluid'
 
   AVL_AVE_CARRIER = 'Mixed Carrier RNA, AVE, AVL'
 
   EXTRACTION_PLATE = 'Extracted Sample Plate'
 
   def components
-    [ 
+    [
        {
          input_name: POOLED_PLATE,
          qty: 140, units: MICROLITERS,
@@ -85,10 +84,10 @@ class Protocol
         object_type: '96-Well Plate'
       },
       {
-        input_name: DEEP_WELL_PLATE,
+        input_name: DEEP_PLATE_96_WELL,
         qty: 630, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: DEEP_WELL_PLATE
+        object_type: DEEP_PLATE_96_WELL
       },
       {
         input_name: QIAAMP_PLATE,
@@ -99,81 +98,23 @@ class Protocol
     ]
   end
 
-  def consumables
+  def consumable_data
     [
       {
-        input_name: '96 Well Deepwell Plate',
-        qty: 2, units: 'Each',
-        description: DEEP_WELL_PLATE
+        consumable: CONSUMABLES[DEEP_PLATE_96_WELL],
+        qty: 2, units: 'Each'
       },
       {
-        input_name: '96 Well Plate',
-        qty: 2, units: 'Each',
-        description: MICROLITERS
+        consumable: CONSUMABLES[PLATE_96_WELL],
+        qty: 2, units: 'Each'
       },
       {
-        input_name: TAPE_PAD,
-        qty: 1, units: 'Each',
-        description: TAPE_PAD
+        consumable: CONSUMABLES[TAPE_PAD],
+        qty: 1, units: 'Each'
       }
     ]
   end
 
-  def kits
-    [
-      {
-        input_name: EXTRACTION_KIT,
-        qty: 1, units: 'kits',
-        description: EXTRACTION_KIT,
-        location: 'Room Temperature Location TBD',
-        components: [
-          {
-            input_name: AVL,
-            qty: 560, units: MICROLITERS,
-            sample_name: AVL,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: AW1,
-            qty: 500, units: MICROLITERS,
-            sample_name: AW1,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: AW2,
-            qty: 500, units: MICROLITERS,
-            sample_name: AW2,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: AVE,
-            qty: 80, units: MICROLITERS,
-            sample_name: AVE,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: ELUTE,
-            qty: nil, units: MICROLITERS,
-            sample_name: ELUTE,
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: CARRIER,
-            qty: 60, units: MICROLITERS,
-            sample_name: CARRIER,
-            object_type: 'Reagent Bottle'
-          }
-        ],
-        consumables: [
-          {
-            input_name: QIAAMP_PLATE,
-            qty: 10, units: 'Each',
-            description: QIAAMP_PLATE
-          }
-        ]
-      }
-    ]
-  end
   ########## DEFAULT PARAMS ##########
 
   # Default parameters that are applied equally to all operations.
@@ -212,22 +153,20 @@ class Protocol
     )
 
     operations.make
-    set_up_test(operations)
+    set_up_test(operations) if debug
+
+    required_reactions = get_number_of_required_reactions(operations)
 
     operations.each do |op|
-      composition = CompositionFactory.build(components: components,
-                                             consumables: consumables,
-                                             kits: kits)
-      op.temporary[:composition] = composition
-      composition.make_kit_component_items
-      composition.input(ETHANOL).item = find_random_item(
-        sample: composition.input(ETHANOL).sample,
-        object_type: composition.input(ETHANOL).object_type
+      op.temporary[:composition] = setup_kit_composition(
+        kit_sample_name: EXTRACTION_KIT,
+        num_reactions_required: required_reactions,
+        components: components,
+        consumables: consumable_data
       )
-      composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
-      show_retrieve_components([composition.input(POOLED_PLATE), composition.input(ETHANOL)])
-      show_retrieve_consumables(composition.consumables)
-      show_retrieve_kits(composition.kits)
+
+      op.temporary[:composition].first.input(POOLED_PLATE).item =
+        op.input(POOLED_PLATE).collection
     end
 
     prep_carrier_rna(operations: operations)
@@ -237,34 +176,34 @@ class Protocol
     dilute_buffer(operations: operations, input: AW2)
 
     copy_and_add_item_to_all(operations: operations,
-                             to_name: DEEP_WELL_PLATE,
+                             to_name: DEEP_PLATE_96_WELL,
                              from_name: POOLED_PLATE,
                              from_item: AVL_AVE_CARRIER)
 
-    seal_plate(operations.map{ |op| op.temporary[:composition].input(DEEP_WELL_PLATE).item },
-               seal: operations.first.temporary[:composition].input(TAPE_PAD).input_name)
+    seal_plate(operations.map{ |op| op.temporary[:composition].first.input(DEEP_PLATE_96_WELL).item },
+               seal: operations.first.temporary[:composition][1].input(TAPE_PAD))
 
     show_incubate_items(
-      items: operations.map { |op| op.temporary[:composition].input(DEEP_WELL_PLATE).item },
+      items: operations.map { |op| op.temporary[:composition].first.input(DEEP_PLATE_96_WELL).item },
       time: { qty: 10, units: MINUTES },
       temperature: default_job_params[:incubation_params][:temperature]
     )
 
     add_item_to_all(operations: operations,
-                    to_name: DEEP_WELL_PLATE,
+                    to_name: DEEP_PLATE_96_WELL,
                     from_name: ETHANOL)
 
     2.times do 
       copy_and_add_item_to_all(operations: operations,
                               to_name: QIAAMP_PLATE,
-                              from_name: DEEP_WELL_PLATE,
+                              from_name: DEEP_PLATE_96_WELL,
                               sblock: true)
 
-      seal_plate(operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
-                 seal: operations.first.temporary[:composition].input(TAPE_PAD).input_name)
+      seal_plate(operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
+                 seal: operations.first.temporary[:composition][1].input(TAPE_PAD).input_name)
 
       spin_down(
-        items: operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item},
+        items: operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item},
         speed: default_job_params[:centrifuge_parameters][:speed],
         time: { qty: 4, units: MINUTES },
         type: 'QIAGEN 4-16KS Centrifuge'
@@ -275,11 +214,11 @@ class Protocol
 
     add_item_to_all(operations: operations, to_name: QIAAMP_PLATE, from_name: AW1)
 
-    seal_plate(operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
-               seal: operations.first.temporary[:composition].input(TAPE_PAD).input_name)
+    seal_plate(operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
+               seal: operations.first.temporary[:composition][1].input(TAPE_PAD).input_name)
 
     spin_down(
-      items: operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
+      items: operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
       speed: default_job_params[:centrifuge_parameters][:speed],
       time: { qty: 4, units: MINUTES },
       type: 'QIAGEN 4-16KS Centrifuge'
@@ -287,11 +226,11 @@ class Protocol
 
     add_item_to_all(operations: operations, to_name: QIAAMP_PLATE, from_name: ETHANOL)
 
-    seal_plate(operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
-               seal: operations.first.temporary[:composition].input(TAPE_PAD).input_name)
+    seal_plate(operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
+               seal: operations.first.temporary[:composition][1].input(TAPE_PAD).input_name)
 
     spin_down(
-      items: operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
+      items: operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
       speed: default_job_params[:centrifuge_parameters][:speed],
       time: { qty: 5, units: MINUTES },
       type: 'QIAGEN 4-16KS Centrifuge'
@@ -300,7 +239,7 @@ class Protocol
     place_on_sblock(operations, QIAAMP_PLATE)
 
     spin_down(
-      items: operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
+      items: operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
       speed: default_job_params[:centrifuge_parameters][:speed],
       time: { qty: 10, units: MINUTES },
       type: 'QIAGEN 4-16KS Centrifuge'
@@ -308,7 +247,7 @@ class Protocol
 
     tab = [['QIAamp 96 Plate ID', 'Clean Elution Plate ID']]
     operations.each do |op|
-      composition = op.temporary[:composition]
+      composition = op.temporary[:composition].first
 
       extraction_comp = composition.input(EXTRACTION_PLATE)
       extraction_comp.item = get_and_label_new_plate(op.output(EXTRACTION_PLATE).collection)
@@ -329,27 +268,39 @@ class Protocol
     add_item_to_all(operations: operations, to_name: QIAAMP_PLATE, from_name: AVE)
 
     spin_down(
-      items: operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
+      items: operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
       speed: default_job_params[:centrifuge_parameters][:speed],
       time: { qty: 4, units: MINUTES },
       type: 'QIAGEN 4-16KS Centrifuge'
     )
 
-    seal_plate(operations.map{ |op| op.temporary[:composition].input(QIAAMP_PLATE).item },
-               seal: operations.first.temporary[:composition].input(TAPE_PAD).input_name)
+    seal_plate(operations.map{ |op| op.temporary[:composition].first.input(QIAAMP_PLATE).item },
+               seal: operations.first.temporary[:composition][1].input(TAPE_PAD).input_name)
 
     {}
   end
 
+  # determins the total number of reactions required for job
+  # @param operations [OperationList] list of operations
+  #
+  # @return [Int] numer of reactions required for job
+  def get_number_of_required_reactions(operations)
+    num = 0
+    operations.each do |op|
+      num += op.input(POOLED_PLATE).collection.get_non_empty.length
+    end
+    num
+  end
+
   def add_item_to_all(operations:, to_name:, from_name:)
     operations.each do |op|
-      composition = op.temporary[:composition]
+      composition, = op.temporary[:composition].first
       map = one_to_one_association_map(from_collection: composition.input(to_name).item)
       source = composition.input(from_name)
       source = composition.input(EXTRACTION_KIT).input(from_name) unless source.present?
 
       destination = composition.input(to_name)
-      destination = composition.input(EXTRACTION_KIT).input(to_name) unless destination.present?
+      destination = composition.input(to_name) unless destination.present?
 
       multichannel_item_to_collection(
         source: source.item,
@@ -363,10 +314,12 @@ class Protocol
   def copy_and_add_item_to_all(operations:, to_name:, from_name:,
                                from_item: nil, sblock: false)
     operations.each do |op|
-      composition = op.temporary[:composition]
+      composition, consumables, _kit_ = op.temporary[:composition]
 
       deep_plate = composition.input(to_name)
-      deep_plate.item = make_new_plate(deep_plate.object_type)
+      plate_object_type = ObjectType.find(consumables.input(DEEP_PLATE_96_WELL))
+
+      deep_plate.item = make_new_plate(plate_object_type)
       place_on_sblock([op], to_name) if sblock
       input_plate = composition.input(from_name).item
       map = one_to_one_association_map(from_collection: input_plate)
@@ -392,11 +345,11 @@ class Protocol
   end
 
   def place_on_sblock(ops, comp_name)
-    show do 
-      title "Place on #{ops.first.temporary[:composition].input('96 Well Deepwell Plate').input_name}"
+    show do
+      title "Place on #{ops.first.temporary[:composition][1].input(DEEP_PLATE_96_WELL) }"
       ops.each do |op|
-        comp = op.temporary[:composition]
-        note "Place <b>#{comp.input(comp_name).item}</b> on a new <b>#{comp.input('96 Well Deepwell Plate').input_name}</b>"
+        comp. consumable, _kit_ = op.temporary[:composition]
+        note "Place <b>#{comp.input(comp_name).item}</b> on a new <b>#{consumable.input(DEEP_PLATE_96_WELL)}</b>"
       end
     end
   end
@@ -406,8 +359,9 @@ class Protocol
   # @param 
   def dilute_buffer(operations:, input:)
     operations.each do |op|
-      component = op.temporary[:composition].input(EXTRACTION_KIT).input(input)
-      ethanol = op.temporary[:composition].input(ETHANOL)
+      comp = op.temporary[:composition].first
+      component = comp.input(input)
+      ethanol = comp.input(ETHANOL)
       show do
         title 'Dilute Buffer Concentrate'
         note "Add appropriate amount of ethanol <b>#{ethanol.item}</b> to <b>#{component.input_name} #{component.item}</b>"
@@ -420,17 +374,16 @@ class Protocol
   # @param operations [OperationList] list of operations
   def prep_carrier_rna(operations:)
     operations.each do |op|
-      composition = op.temporary[:composition]
+      composition = op.temporary[:composition].first
       num_samples = composition.input(POOLED_PLATE).item.get_non_empty.length
-      kit = composition.input(EXTRACTION_KIT)
-      kit.input(AVE).adj_qty = 1550 # TODO Encode this somewhere not hard coded
+      composition.input(AVE).adj_qty = 1550 # TODO Encode this somewhere not hard coded
 
       mix = composition.input(AVL_AVE_CARRIER)
-      avl = kit.input(AVL)
-      carrier = kit.input(AVL)
+      avl = composition.input(AVL)
+      carrier = composition.input(AVL)
 
-      create_master_mix(components: [kit.input(AVE)],
-                        master_mix_item: carrier.item,
+      create_master_mix(components: [composition.input(AVE)],
+                        master_mix: carrier,
                         adj_qty: true)
 
       mix.item = make_item(
@@ -442,7 +395,7 @@ class Protocol
       carrier.adjusted_qty(num_samples)
 
       create_master_mix(components: [avl, carrier],
-                        master_mix_item: mix.item,
+                        master_mix: mix,
                         adj_qty: true,
                         vortex: false)
       show do
