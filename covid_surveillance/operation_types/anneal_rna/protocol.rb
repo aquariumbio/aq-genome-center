@@ -15,8 +15,8 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'Composition Libs/AbstractComposition'
-needs 'Composition Libs/CompositionHelper'
+needs 'Composition Libs/Composition'
+needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
 needs 'Collection Management/CollectionTransfer'
