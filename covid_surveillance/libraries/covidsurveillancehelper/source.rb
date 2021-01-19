@@ -6,13 +6,13 @@ needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'CompositionLibs/AbstractComposition'
 needs 'CompositionLibs/CompositionHelper'
-needs 'Standard Libs/DisplayHelper'
+needs 'Standard Libs/TextDisplayHelper'
 
 
 module CovidSurveillanceHelper
   include KitHelper
   include CompositionHelper
-  include DisplayHelper
+  include TextDisplayHelper
 
   # coordinates finding and setting up a kit with the composition libs
   #

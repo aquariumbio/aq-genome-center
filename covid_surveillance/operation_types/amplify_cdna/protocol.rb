@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -61,38 +61,33 @@ class Protocol
        {
          input_name: POOLED_PLATE,
          qty: 5, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         sample_name: 'Pooled Specimens'
        },
        {
          input_name: MASTER_MIX,
          qty: 20, units: MICROLITERS,
-         sample_name: MASTER_MIX,
-         object_type: TEST_TUBE
+         sample_name: MASTER_MIX
        },
        {
         input_name: MASTER_MIX_2,
         qty: 20, units: MICROLITERS,
-        sample_name: MASTER_MIX,
-        object_type: TEST_TUBE
+        sample_name: MASTER_MIX
        },
        {
         input_name: COV1,
         qty: nil, units: MICROLITERS,
-        sample_name: 'Pooled Specimens',
-        object_type: PLATE_384_WELL
+        sample_name: 'Pooled Specimens'
       },
       {
         input_name: COV2,
         qty: nil, units: MICROLITERS,
-        sample_name: 'Pooled Specimens',
-        object_type: PLATE_384_WELL
+        sample_name: 'Pooled Specimens'
       },
       {
         input_name: WATER,
         qty: 3.91, units: MICROLITERS,
         sample_name: WATER,
-        object_type: 'Reagent Bottle'
+        suggested_ot: 'Reagent Bottle'
       }
     ]
   end
@@ -137,9 +132,9 @@ def default_operation_params
     dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                        speed: create_qty(qty: 1600, units: RPM) },
+                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 1000, units: TIMES_G) },
+                             speed: create_qty(qty: 1000, units: TIMES_G) },
     thermocycler_model: TestThermocycler::MODEL,
     program_name: 'CDC_TaqPath_CG',
     qpcr: true
@@ -177,7 +172,7 @@ COV2 = 'COV2'.freeze
 
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
-        object_type: composition.input(WATER).object_type
+        object_type: composition.input(WATER).suggested_ot
       )
 
       composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
