@@ -25,9 +25,10 @@ module CovidSurveillanceHelper
                             components:,
                             consumables:)
     kit = find_kit(kit_sample_name, num_reactions_required)
+    all_comps = components + kit.components
 
     composition = CompositionFactory.build(
-      components: components.append(kit.components).flatten
+      component_data: all_comps
     )
 
     all_cons = consumables + kit.consumables

@@ -26,8 +26,8 @@ needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams

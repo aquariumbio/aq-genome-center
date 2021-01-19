@@ -60,14 +60,12 @@ class Protocol
        {
          input_name: POOLED_PLATE,
          qty: 8.5, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         sample_name: 'Pooled Specimens'
        },
        {
          input_name: CDNA_PLATE,
          qty: nil, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         sample_name: 'Pooled Specimens'
        }
     ]
   end
