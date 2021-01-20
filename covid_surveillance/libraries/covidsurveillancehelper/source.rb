@@ -56,7 +56,7 @@ module CovidSurveillanceHelper
 
   def master_mix_handler(components:, mm:, mm_container:, adjustment_multiplier: nil)
     mm.item = make_item(sample: mm.sample,
-                        object_type: mm.object_type)
+                        object_type: mm.suggested_ot)
     show_block = label_items(
       objects: [mm_container],
       labels: ["#{mm.input_name}-#{mm.item}"]
