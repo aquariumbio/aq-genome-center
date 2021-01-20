@@ -66,12 +66,14 @@ class Protocol
        {
          input_name: MASTER_MIX,
          qty: 20, units: MICROLITERS,
-         sample_name: MASTER_MIX
+         sample_name: MASTER_MIX,
+         object_type: TEST_TUBE
        },
        {
         input_name: MASTER_MIX_2,
         qty: 20, units: MICROLITERS,
-        sample_name: MASTER_MIX
+        sample_name: MASTER_MIX,
+        object_type: TEST_TUBE
        },
        {
         input_name: COV1,
