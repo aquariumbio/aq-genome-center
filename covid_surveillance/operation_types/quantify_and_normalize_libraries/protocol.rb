@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -22,8 +22,8 @@ needs 'Collection Management/CollectionActions'
 
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -56,22 +56,20 @@ class Protocol
         input_name: POOLED_LIBRARY,
         qty: 10, units: MICROLITERS,
         sample_name: nil,
-        object_type: nil,
-        notes: 'na'
+        suggested_ot: nil
       },
       {
         input_name: MASTER_MIX,
         qty: 180, units: MICROLITERS,
         sample_name: MASTER_MIX,
-        object_type: 'Reagent Bottle',
-        notes: 'na'
+        suggested_ot: 'Reagent Bottle'
      },
      {
-      input_name: RSB_HT,
-      qty: nil, units: MICROLITERS,
-      sample_name: 'nil',
-      object_type: 'Reagent Bottle',
-      notes: 'Thaw and Keep on Ice'
+       input_name: RSB_HT,
+       qty: nil, units: MICROLITERS,
+       sample_name: RSB_HT,
+       suggested_ot: 'Reagent Bottle',
+       notes: 'Thaw and Keep on Ice'
     },
     ]
   end
@@ -144,6 +142,11 @@ end
         consumables: consumable_data
       )
 
+      composition.input(RSB_HT).item = find_random_item(
+        sample: composition.input(RSB_HT).sample,
+        object_type: composition.input(RSB_HT).suggested_ot
+      )
+
       composition.input(POOLED_LIBRARY).item = op.input(POOLED_LIBRARY).item
 
       adj_vol_list = reject_components(
@@ -166,8 +169,6 @@ end
       retrieve_list += consumables.consumables
     end
 
-    show_retrieve_parts(retrieve_list)
-
     first_composition, consumables = operations.first.temporary[COMPOSITION_KEY]
     mm_components = [first_composition.input(COMP_B),
                      first_composition.input(COMP_A)]
@@ -178,6 +179,8 @@ end
       adjustment_multiplier: required_reactions,
       mm_container: consumables.input(TEST_TUBE)
     )
+
+    show_retrieve_parts(retrieve_list)
 
     display_hash(
       title: 'Prepare Items',
@@ -202,15 +205,15 @@ end
     )
 
     show_block_2b = pipet(volume: first_composition.input(MASTER_MIX).volume_hash,
-                          source: first_composition.input(MASTER_MIX),
-                          destination: label_list.to_s)
+                          source: first_composition.input(MASTER_MIX).display_name,
+                          destination: label_list.join(', '))
 
     show_block_2c = pipet(volume: first_composition.input(COMP_C).volume_hash,
-                          source: first_composition.input(MASTER_MIX),
+                          source: first_composition.input(MASTER_MIX).display_name,
                           destination: 's-1')
 
     show_block_2d = pipet(volume: first_composition.input(COMP_D).volume_hash,
-                          source: first_composition.input(MASTER_MIX),
+                          source: first_composition.input(MASTER_MIX).display_name,
                           destination: 's-2')
 
     show_block_2e = []

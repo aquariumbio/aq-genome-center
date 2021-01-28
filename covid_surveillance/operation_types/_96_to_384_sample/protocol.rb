@@ -38,36 +38,36 @@ class Protocol
   ################ Composition Parts ####################
 
   def components
-    [ 
+    [
        {
          input_name: PLATE_A,
          qty: 8.5, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: PLATE96
+         suggested_ot: PLATE96
        },
        {
         input_name: PLATE_B,
         qty: 8.5, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: PLATE96
+        suggested_ot: PLATE96
       },
       {
         input_name: PLATE_C,
         qty: 8.5, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: PLATE96
+        suggested_ot: PLATE96
       },
       {
         input_name: PLATE_D,
         qty: 8.5, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: PLATE96
+        suggested_ot: PLATE96
       },
       {
         input_name: POOLED_PLATE,
         qty: nil, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: PLATE
+        suggested_ot: PLATE
       }
     ]
   end

@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -24,9 +24,8 @@ needs 'PCR Protocols/RunThermocycler'
 
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -53,31 +52,37 @@ class Protocol
   IDT_PLATE = 'Index Adapter'
   SPARE_PLATE = '96 Well Plate'
 
+  WORKFLOW_NAME = 'GenerateFASTQ'
+  APPLICATION_NAME = 'NovaSeqFASTQOnly'
+  INSTRUMENTTYPE = 'NovaSeq'
+  ASSAY_NAME = 'TruSeqNanoDNA'
+
+
   def components
     [ 
        {
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         suggested_ot: PLATE_384_WELL
        },
        {
          input_name: WATER,
          qty: 24, units: MICROLITERS,
          sample_name: WATER,
-         object_type: 'Reagent Bottle'
+         suggested_ot: 'Reagent Bottle'
       },
       {
         input_name: MASTER_MIX,
         qty: 20, units: MICROLITERS,
         sample_name: MASTER_MIX,
-        object_type: TEST_TUBE
+        suggested_ot: TEST_TUBE
       },
       {
         input_name: IDT_PLATE,
         qty: 10, units: MICROLITERS,
         sample_name: IDT_PLATE,
-        object_type: PLATE_384_WELL
+        suggested_ot: PLATE_384_WELL
       }
     ]
   end
@@ -172,7 +177,7 @@ end
       plate = composition.input(POOLED_PLATE).item
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
-        object_type: composition.input(WATER).object_type
+        object_type: composition.input(WATER).suggested_ot
       )
 
       mm = composition.input(MASTER_MIX)
@@ -184,7 +189,7 @@ end
                     multi: adj_multi)
 
       mm.item = make_item(sample: mm.sample,
-                          object_type: mm.object_type)
+                          object_type: mm.suggested_ot)
 
       retrieve_list = reject_components(
         list_of_rejections: [MASTER_MIX, POOLED_PLATE],
@@ -198,7 +203,7 @@ end
       )
       show_block_1 = []
       show_block_1.append(
-        { display: shake(items: vortex_list,
+        { display: shake(items: vortex_list.map(&:display_name),
                          type: Vortex::NAME),
           type: 'note' }
       )
@@ -235,7 +240,7 @@ end
       show_block_1.append(
         use_robot(program: remove_supernatant_program,
                   robot: mosquito_robot,
-                  items: [plate])
+                  items: [composition.input(POOLED_PLATE).display_name])
       )
 
       add_mm_program = LiquidRobotProgramFactory.build(
@@ -245,7 +250,8 @@ end
       show_block_1.append(
         use_robot(program: add_mm_program,
                   robot: drgrobot,
-                  items: [plate, composition.input(MASTER_MIX)])
+                  items: [composition.input(POOLED_PLATE).display_name,
+                          composition.input(MASTER_MIX).display_name])
       )
 
 
@@ -256,7 +262,8 @@ end
       show_block_1.append(
         use_robot(program: index_transfer_program,
                   robot: mosquito_robot,
-                  items: [plate, composition.input(IDT_PLATE)])
+                  items: [composition.input(POOLED_PLATE).display_name,
+                          composition.input(IDT_PLATE)])
       )
       association_map = one_to_one_association_map(from_collection: plate)
 
@@ -274,14 +281,15 @@ end
         transfer_vol: composition.input(IDT_PLATE).volume_hash
       )
 
-      transfer_adapter_index(from_plate: plate,
-                             to_plate: composition.input(IDT_PLATE).item)
+      transfer_adapter_index(from_plate: composition.input(IDT_PLATE).item,
+                             to_plate: plate)
 
       show_block_2 = []
       show_block_2.append(
         {
           display: seal_plate(
-            [plate], seal: consumables.input(AREA_SEAL)
+            [composition.input(POOLED_PLATE).display_name],
+            seal: consumables.input(AREA_SEAL)
           ),
           type: 'note'
         }
@@ -290,7 +298,7 @@ end
       show_block_2.append(
         {
           display: shake(
-            items: [plate],
+            items: [composition.input(POOLED_PLATE).display_name],
             speed: temporary_options[:shaker_parameters][:speed],
             time: temporary_options[:shaker_parameters][:time]
           ),
@@ -301,7 +309,7 @@ end
       show_block_2.append(
         {
           display: spin_down(
-            items: [plate],
+            items: [composition.input(POOLED_PLATE).display_name],
             speed: temporary_options[:centrifuge_parameters][:speed],
             time: temporary_options[:centrifuge_parameters][:time]
           ),
@@ -311,7 +319,7 @@ end
 
       show_block_2.append(
         {
-          display: pipet_up_and_down(plate),
+          display: pipet_up_and_down(composition.input(POOLED_PLATE).display_name),
           type: 'note'
         }
       )
@@ -327,17 +335,79 @@ end
       )
 
       run_qpcr(op: op,
-               plates: [plate])
+               plates: [composition.input(POOLED_PLATE).item])
+
+      generate_csv(composition.input(POOLED_PLATE).item, op)
     end
 
     {}
 
   end
 
+  def generate_csv(plate, op)
+    csv_arrays = [
+      ['[Header]'],
+      [],
+      ['IEMFileVersion', 5],
+      [],
+      ['Date', Time.new.strftime("%m/%d/%Y")],
+      [],
+      ['Workflow', WORKFLOW_NAME],
+      [],
+      ['Application', APPLICATION_NAME],
+      [],
+      ['InstrumentType', INSTRUMENTTYPE],
+      [],
+      ['Assay', ASSAY_NAME],
+      [],
+      ['IndexAdapters'],
+      [],
+      ['Description'],
+      [],
+      ['Chemsitry'],
+      [],
+      [],
+      [],
+      ['[Reads]'],
+      [],
+      [151],
+      [],
+      [151],
+      [],
+      [],
+      [],
+      ['[Settings]'],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      [],
+      ['[Data]'],
+      ['Lane', 'Sample_ID', 'Sample_Name', 'Sample_Plate', 'Sample_Well',
+       'i7_Index_ID', 'index', 'i5_Index_ID', 'index2',
+       'Sample_Project', 'Description']
+    ]
+    plate.parts.each do |well|
+      csv_arrays.push([])
+      csv_arrays.push(
+        [nil, well.sample.name,nil,nil,nil,nil,
+         well.get(INDEX_KEY),nil,nil,nil,nil]
+      )
+    end
+    output_csv = CSV.new(csv_arrays.to_csv)
+    inspect output_csv if debug
+    op.associate(INDEX_CSV_KEY, output_csv)
+  end
+
   def transfer_adapter_index(from_plate:, to_plate:)
-    from_plate.parts.zip(to_plate.parts).each do |from, to|
-      skip if from.nil? || to.nil?
-      to_plate.associate(INDEX_KEY, from.get(INDEX_KEY))
+    from_plate.get_non_empty.each do |r, c|
+      to_part = to_plate.part(r, c)
+      from_part = from_plate.part(r, c)
+      next if to_part.nil? || from_part.nil?
+
+      to_part.associate(INDEX_KEY, from_part.sample.name.to_s)
     end
   end
 
@@ -351,10 +421,6 @@ end
     plate = op.input(IDT_PLATE).collection
     samples = Array.new(plate.get_empty.length, sample)
     plate.add_samples(samples)
-
-    op.input(IDT_PLATE).collection.parts.each do |part|
-      part.associate(INDEX_KEY, [1,2,3,4].sample)
-    end
   end
 
 end
