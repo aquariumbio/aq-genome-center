@@ -10,3 +10,5 @@ class ProtocolTest < ProtocolTestBase
     assert_equal(@backtrace.last[:operation], 'complete')
   end
 end
+
+

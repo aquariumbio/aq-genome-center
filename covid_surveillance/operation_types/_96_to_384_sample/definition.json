@@ -1,0 +1,47 @@
+{
+  "name": "96 to 384 Sample",
+  "parent_class": "OperationType",
+  "category": "Covid Surveillance",
+  "inputs": [
+    {
+      "name": "Plate A",
+      "part": true,
+      "array": false,
+      "routing": "A"
+    },
+    {
+      "name": "Plate B",
+      "part": true,
+      "array": null,
+      "routing": "B"
+    },
+    {
+      "name": "Plate C",
+      "part": true,
+      "array": null,
+      "routing": "C"
+    },
+    {
+      "name": "Plate D",
+      "part": true,
+      "array": null,
+      "routing": "D"
+    },
+    {
+      "name": "Options",
+      "part": null,
+      "array": null,
+      "routing": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Pooled Sample Plate",
+      "part": true,
+      "array": null,
+      "routing": "O"
+    }
+  ],
+  "on_the_fly": null,
+  "user_id": 1
+}

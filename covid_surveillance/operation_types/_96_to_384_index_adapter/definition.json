@@ -1,0 +1,47 @@
+{
+  "name": "96 to 384 Index Adapter",
+  "parent_class": "OperationType",
+  "category": "Covid Surveillance",
+  "inputs": [
+    {
+      "name": "Plate A",
+      "part": true,
+      "array": false,
+      "routing": "A"
+    },
+    {
+      "name": "Plate B",
+      "part": true,
+      "array": false,
+      "routing": "B"
+    },
+    {
+      "name": "Plate C",
+      "part": true,
+      "array": false,
+      "routing": "C"
+    },
+    {
+      "name": "Plate D",
+      "part": true,
+      "array": false,
+      "routing": "D"
+    },
+    {
+      "name": "Options",
+      "part": false,
+      "array": false,
+      "routing": null
+    }
+  ],
+  "outputs": [
+    {
+      "name": "Pooled Sample Plate",
+      "part": true,
+      "array": false,
+      "routing": "O"
+    }
+  ],
+  "on_the_fly": false,
+  "user_id": 1
+}

@@ -11,6 +11,7 @@ needs 'Small Instruments/Shakers'
 needs 'Standard Libs/Units'
 needs 'Covid Surveillance/SampleConstants'
 needs 'Covid Surveillance/AssociationKeys'
+needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'CompositionLibs/AbstractComposition'
@@ -21,6 +22,13 @@ needs 'Collection Management/CollectionActions'
 
 needs 'PCR Protocols/RunThermocycler'
 
+needs 'Container/ItemContainer'
+needs 'Container/KitHelper'
+needs 'Kits/KitContents'
+
+needs 'ConsumableLibs/Consumables'
+
+needs 'ConsumableLibs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -38,6 +46,10 @@ class Protocol
   include CollectionTransfer
   include CollectionActions
   include RunThermocycler
+  include KitHelper
+  include CovidSurveillanceHelper
+  include KitContents
+  include ConsumableDefinitions
 
   #========== Composition Definitions ==========#
 
@@ -54,8 +66,8 @@ class Protocol
        {
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
-         sample_name: nil,
-         object_type: nil
+         sample_name: 'Pooled Specimens',
+         object_type: PLATE_384_WELL
        },
        {
          input_name: MASTER_MIX,
@@ -66,44 +78,11 @@ class Protocol
     ]
   end
 
-  def consumables
+  def consumable_data
     [
       {
-        input_name: AREA_SEAL,
-        qty: 1, units: 'Each',
-        description: 'Adhesive Plate Seal'
-      }
-    ]
-  end
-
-  def kits
-    [
-      {
-        input_name: FIRST_STRAND_KIT,
-        qty: 1, units: 'kits',
-        description: 'Kit for synthesizing first strand cDNA',
-        location: 'M80 Freezer',
-        components: [
-          {
-            input_name: FSM_HT,
-            qty: 9, units: MICROLITERS,
-            sample_name: 'First Strand Mix HT',
-            object_type: 'Reagent Bottle'
-          },
-          {
-            input_name: RVT_HT,
-            qty: 1, units: MICROLITERS,
-            sample_name: 'Reverse Transcriptase HT',
-            object_type: 'Reagent Bottle'
-          }
-        ],
-        consumables: [
-          {
-            input_name: MICRO_TUBES,
-            qty: 1, units: 'Each',
-            description: '1.7 ml Tube'
-          }
-        ]
+        consumable: CONSUMABLES[AREA_SEAL],
+        qty: 1, units: 'Each'
       }
     ]
   end
@@ -128,8 +107,8 @@ end
 #
 def default_operation_params
   {
-    robot_program: 'abstract program',
-    instrument_model: TestLiquidHandlingRobot::MODEL,
+    dragonfly_robot_program: 'FS CDNA MM',
+    dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                          speed: create_qty(qty: 1600, units: RPM) },
@@ -150,85 +129,78 @@ def main
     default_operation_params: default_operation_params
   )
 
-  paired_ops = pair_ops_with_instruments(operations: operations,
-                                         instrument_key: LIQUID_ROBOT_PARAM)
-
-  remove_unpaired_operations(operations - paired_ops)
-
-  paired_ops.each do |op|
-    date = DateTime.now.strftime('%Y-%m-%d')
-    file_name = "#{date}_Job_#{op.jobs.ids.last}_Op_#{op.id}_Plan_#{op.plan.id}"
+  operations.each do |op|
+    op.pass(POOLED_PLATE)
 
     set_up_test(op) if debug
     temporary_options = op.temporary[:options]
 
-    composition = CompositionFactory.build(components: components,
-                                           consumables: consumables,
-                                           kits: kits)
+    plate = op.input(POOLED_PLATE).collection
 
-    program = LiquidRobotProgramFactory.build(
-      program_name: temporary_options[:robot_program]
+    required_reactions = create_qty(qty: plate.parts.length,
+                                    units: 'rxn')
+
+    composition, consumables, kit = setup_kit_composition(
+      kit_sample_name: FIRST_STRAND_KIT,
+      num_reactions_required: required_reactions,
+      components: components,
+      consumables: consumable_data
     )
 
-    robot = LiquidRobotFactory.build(model: temporary_options[:instrument_model],
-                                     name: op.temporary[INSTRUMENT_NAME],
-                                     protocol: self)
+    composition.input(POOLED_PLATE).item = plate
 
-    unless check_robot_compatibility(input_object: op.input(POOLED_PLATE).collection,
-                                     robot: robot,
-                                     program: program)
-      remove_unpaired_operations([op])
-      next
-    end
+    retrieve_list = reject_components(
+      list_of_rejections: [MASTER_MIX],
+      components: composition.components
+    )
+    show_retrieve_parts(retrieve_list + consumables.consumables)
 
-    composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
-    plate = composition.input(POOLED_PLATE).item
-    op.pass(POOLED_PLATE)
+    vortex_list = reject_components(
+      list_of_rejections: [POOLED_PLATE],
+      components: retrieve_list
+    )
 
-    show_get_composition(composition: composition)
-
-    retrieve_materials([plate])
-
-    vortex_objs(composition.kits.map { |kit|
-      kit.composition.components.map(&:input_name)
-    }.flatten)
-
-    composition.make_kit_component_items
+    show_block_1a = []
+    show_block_1a.append(shake(items: vortex_list,
+                               type: Vortex::NAME))
 
     adj_multiplier = plate.get_non_empty.length
-    mm_components = [composition.input(FIRST_STRAND_KIT).input(FSM_HT),
-                     composition.input(FIRST_STRAND_KIT).input(RVT_HT)]
-    adjust_volume(components: mm_components,
-                  multi: adj_multiplier)
+    mm_components = [composition.input(FSM_HT),
+                     composition.input(RVT_HT)]
 
-    mm = composition.input(MASTER_MIX)
+    show_block_1b = master_mix_handler(components: mm_components,
+                                       mm: composition.input(MASTER_MIX),
+                                       adjustment_multiplier: adj_multiplier,
+                                       mm_container: composition.input(MICRO_TUBES)
+                                      )
 
-    mm.item = make_item(sample: mm.sample,
-                        object_type: mm.object_type)
+    display_hash(
+      title: 'Prepare for Procedure',
+      hash_to_show: [
+        show_block_1a.flatten,
+        show_block_1b.flatten
+      ]
+    )
 
-    label_items(objects: [composition.input(FIRST_STRAND_KIT).input(MICRO_TUBES).input_name],
-                labels: [mm.item])
+    drgprogram = LiquidRobotProgramFactory.build(
+      program_name: temporary_options[:dragonfly_robot_program]
+    )
 
-    create_master_mix(components: mm_components,
-                      master_mix_item: mm.item,
-                      adj_qty: true)
+    drgrobot = LiquidRobotFactory.build(
+      model: temporary_options[:dragonfly_robot_model],
+      name: op.temporary[:robot_model],
+      protocol: self
+    )
 
-    robot.turn_on
-
-    go_to_instrument(instrument_name: robot.model_and_name)
-
-    robot.select_program_template(program: program)
-
-    robot.save_run(path: program.run_file_path, file_name: file_name)
-
-    robot.follow_template_instructions
-
-    wait_for_instrument(instrument_name: robot.model_and_name)
-
-    robot.remove_item(item: plate)
+    display_hash(
+      title: 'Set Up and Run Robot',
+      hash_to_show: use_robot(program: drgprogram,
+                              robot: drgrobot,
+                              items: [composition.input(MASTER_MIX), plate])
+    )
 
     association_map = one_to_one_association_map(from_collection: plate)
-
+    kit.remove_volume(required_reactions)
     associate_transfer_item_to_collection(
       from_item: composition.input(MASTER_MIX).item,
       to_collection: plate,
@@ -236,20 +208,39 @@ def main
       transfer_vol: composition.input(MASTER_MIX).volume_hash
     )
 
-    seal_plate(plate, seal: composition.input(AREA_SEAL).input_name)
+    kit.remove_volume(required_reactions)
 
-    shake(items: [plate],
-          speed: temporary_options[:shaker_parameters][:speed],
-          time: temporary_options[:shaker_parameters][:time])
+    show_block_3a = []
+    show_block_3a.append(seal_plate(
+      [plate], seal: consumables.input(AREA_SEAL)
+    ))
 
-    spin_down(items: [plate],
-              speed: temporary_options[:centrifuge_parameters][:speed],
-              time: temporary_options[:centrifuge_parameters][:time])
+    show_block_3b = []
+    show_block_3b.append(shake(
+      items: [plate],
+      speed: temporary_options[:shaker_parameters][:speed],
+      time: temporary_options[:shaker_parameters][:time]
+    ))
 
-    trash_object(composition.kits.map { |k| k.components.map(&:item) }.flatten)
+    show_block_3c = []
+    show_block_3c.append(spin_down(
+      items: [plate],
+      speed: temporary_options[:centrifuge_parameters][:speed],
+      time: temporary_options[:centrifuge_parameters][:time]
+    ))
+
+    display_hash(
+      title: 'Prepare for Thermocycler',
+      hash_to_show: [
+        show_block_3a.flatten,
+        show_block_3b.flatten,
+        show_block_3c.flatten
+      ]
+    )
+
+    run_qpcr(op: op,
+             plates: [plate])
   end
-
-  run_qpcr(operations: operations, item_key: POOLED_PLATE)
 
   {}
 
