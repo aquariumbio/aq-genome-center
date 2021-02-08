@@ -13,7 +13,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
@@ -51,17 +51,25 @@ module Transfer_96_384
     set_up_test(input_plates) if debug
 
     composition = CompositionFactory.build(
-      components: components
+      component_data: components
     )
     composition.input(POOLED_PLATE).item = op.output(POOLED_PLATE).collection
+
+    plate_comps = []
     plate_name_array.each do |name|
       composition.input(name).item = op.input(name).collection
+      plate_comps.append(composition.input(name))
     end
 
     temporary_options = op.temporary[:options]
 
     # SHOW gets the parts in the composition
-    show_retrieve_parts(composition.components) # and consumables
+    show_retrieve_parts(composition.components)
+
+    display_hash(
+      title: 'Get and Label Plate',
+      hash_to_show: [get_and_label_new_plate(composition.input(POOLED_PLATE).item)]
+    )
 
     program = LiquidRobotProgramFactory.build(
       program_name: temporary_options[:tr_96_384_program]
@@ -72,13 +80,12 @@ module Transfer_96_384
       name: nil,
       protocol: nil
     )
-
+    robot_items = plate_comps + [composition.input(POOLED_PLATE)]
     display_hash(
       title: 'Set Up and Run Robot',
       hash_to_show: use_robot(program: program,
                               robot: robot,
-                              items: [composition.input(plate_name_array),
-                                      composition.input(POOLED_PLATE)].flatten)
+                              items: robot_items.map(&:display_name))
     )
 
     transfer_provenance(plate_transfer_map,

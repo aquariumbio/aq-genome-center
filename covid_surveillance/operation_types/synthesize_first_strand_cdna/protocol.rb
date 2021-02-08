@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -26,9 +26,8 @@ needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -67,13 +66,13 @@ class Protocol
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         suggested_ot: PLATE_384_WELL
        },
        {
          input_name: MASTER_MIX,
          qty: 8, units: MICROLITERS,
          sample_name: MASTER_MIX,
-         object_type: MICRO_TUBES
+         suggested_ot: MICRO_TUBES
        }
     ]
   end
@@ -148,6 +147,7 @@ def main
     )
 
     composition.input(POOLED_PLATE).item = plate
+    plate_display = composition.input(POOLED_PLATE).display_name
 
     retrieve_list = reject_components(
       list_of_rejections: [MASTER_MIX],
@@ -161,18 +161,19 @@ def main
     )
 
     show_block_1a = []
-    show_block_1a.append(shake(items: vortex_list,
+    show_block_1a.append(shake(items: vortex_list.map(&:display_name),
                                type: Vortex::NAME))
 
     adj_multiplier = plate.get_non_empty.length
     mm_components = [composition.input(FSM_HT),
                      composition.input(RVT_HT)]
 
-    show_block_1b = master_mix_handler(components: mm_components,
-                                       mm: composition.input(MASTER_MIX),
-                                       adjustment_multiplier: adj_multiplier,
-                                       mm_container: composition.input(MICRO_TUBES)
-                                      )
+    show_block_1b = master_mix_handler(
+      components: mm_components,
+      mm: composition.input(MASTER_MIX),
+      adjustment_multiplier: adj_multiplier,
+      mm_container: composition.input(MICRO_TUBES)
+    )
 
     display_hash(
       title: 'Prepare for Procedure',
@@ -194,9 +195,12 @@ def main
 
     display_hash(
       title: 'Set Up and Run Robot',
-      hash_to_show: use_robot(program: drgprogram,
-                              robot: drgrobot,
-                              items: [composition.input(MASTER_MIX), plate])
+      hash_to_show: use_robot(
+        program: drgprogram,
+        robot: drgrobot,
+        items: [composition.input(MASTER_MIX).display_name,
+                plate_display]
+      )
     )
 
     association_map = one_to_one_association_map(from_collection: plate)
@@ -212,19 +216,19 @@ def main
 
     show_block_3a = []
     show_block_3a.append(seal_plate(
-      [plate], seal: consumables.input(AREA_SEAL)
+      [plate_display], seal: consumables.input(AREA_SEAL)
     ))
 
     show_block_3b = []
     show_block_3b.append(shake(
-      items: [plate],
+      items: [plate_display],
       speed: temporary_options[:shaker_parameters][:speed],
       time: temporary_options[:shaker_parameters][:time]
     ))
 
     show_block_3c = []
     show_block_3c.append(spin_down(
-      items: [plate],
+      items: [plate_display],
       speed: temporary_options[:centrifuge_parameters][:speed],
       time: temporary_options[:centrifuge_parameters][:time]
     ))

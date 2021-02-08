@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
@@ -27,9 +27,9 @@ needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
+needs 'Consumable Libs/Consumables'
 
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 
 class Protocol
@@ -60,14 +60,12 @@ class Protocol
        {
          input_name: POOLED_PLATE,
          qty: 8.5, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         sample_name: 'Pooled Specimens'
        },
        {
          input_name: CDNA_PLATE,
          qty: nil, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         sample_name: 'Pooled Specimens'
        }
     ]
   end
@@ -148,19 +146,27 @@ end
 
       op.output(POOLED_PLATE).make_collection
       cdna = op.output(POOLED_PLATE).collection
+      composition.input(CDNA_PLATE).item = cdna
+
+      cdna_display = composition.input(CDNA_PLATE).display_name
+      plate_display = composition.input(CDNA_PLATE).display_name
+
+      retrieve_items = reject_components(
+        list_of_rejections: [POOLED_PLATE, CDNA_PLATE],
+        components: composition.components
+      )
 
       # SHOW gets the parts in the composition
-      show_retrieve_parts(composition.components + consumables.consumables)
+      show_retrieve_parts(
+        retrieve_items + consumables.consumables
+      )
 
       # Form a show block array
       show_block_1a = []
       show_block_1a.append(get_and_label_new_plate(cdna))
 
       show_block_1b = shake(
-        items: reject_components(
-          list_of_rejections: [POOLED_PLATE, CDNA_PLATE],
-          components: composition.components
-        ),
+        items: retrieve_items.map(&:display_name),
         type: Vortex::NAME
       )
 
@@ -182,9 +188,12 @@ end
 
       display_hash(
         title: 'Set Up and Run Robot',
-        hash_to_show: use_robot(program: drgprogram,
-                                robot: drgrobot,
-                                items: [composition.input(EPH3_HT), cdna])
+        hash_to_show: use_robot(
+          program: drgprogram,
+          robot: drgrobot,
+          items: [composition.input(EPH3_HT).display_name,
+                  cdna_display]
+        )
       )
 
       program = LiquidRobotProgramFactory.build(
@@ -199,12 +208,14 @@ end
 
       display_hash(
         title: 'Setup and Run Robot',
-        hash_to_show: use_robot(program: program,
-                                robot: robot, items: [plate, cdna])
+        hash_to_show: use_robot(
+          program: program,
+          robot: robot, items: [plate_display, cdna_display]
+        )
       )
 
       association_map = one_to_one_association_map(from_collection: plate)
-      copy_wells(from_collection: plate, 
+      copy_wells(from_collection: plate,
                  to_collection: cdna,
                  association_map: association_map)
 
@@ -227,14 +238,15 @@ end
       show_block_3a = []
       show_block_3a.append(
         seal_plate(
-          [cdna], seal: consumables.input(AREA_SEAL)
+          [cdna_display],
+          seal: consumables.input(AREA_SEAL)
         )
       )
 
       show_block_3b = []
       show_block_3b.append(
         shake(
-          items: [cdna],
+          items: [cdna_display],
           speed: temporary_options[:shaker_parameters][:speed],
           time: temporary_options[:shaker_parameters][:time]
         )
@@ -243,7 +255,7 @@ end
       show_block_3c = []
       show_block_3c.append(
         spin_down(
-          items: [cdna],
+          items: [cdna_display],
           speed: temporary_options[:centrifuge_parameters][:speed],
           time: temporary_options[:centrifuge_parameters][:time]
         )

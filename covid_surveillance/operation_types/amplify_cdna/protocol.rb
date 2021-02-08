@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -26,8 +26,8 @@ needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -61,38 +61,35 @@ class Protocol
        {
          input_name: POOLED_PLATE,
          qty: 5, units: MICROLITERS,
-         sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         sample_name: 'Pooled Specimens'
        },
        {
          input_name: MASTER_MIX,
          qty: 20, units: MICROLITERS,
          sample_name: MASTER_MIX,
-         object_type: TEST_TUBE
+         suggested_ot: TEST_TUBE
        },
        {
         input_name: MASTER_MIX_2,
         qty: 20, units: MICROLITERS,
         sample_name: MASTER_MIX,
-        object_type: TEST_TUBE
+        suggested_ot: TEST_TUBE
        },
        {
         input_name: COV1,
         qty: nil, units: MICROLITERS,
-        sample_name: 'Pooled Specimens',
-        object_type: PLATE_384_WELL
+        sample_name: 'Pooled Specimens'
       },
       {
         input_name: COV2,
         qty: nil, units: MICROLITERS,
-        sample_name: 'Pooled Specimens',
-        object_type: PLATE_384_WELL
+        sample_name: 'Pooled Specimens'
       },
       {
         input_name: WATER,
         qty: 3.91, units: MICROLITERS,
         sample_name: WATER,
-        object_type: 'Reagent Bottle'
+        suggested_ot: 'Reagent Bottle'
       }
     ]
   end
@@ -137,9 +134,9 @@ def default_operation_params
     dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                        speed: create_qty(qty: 1600, units: RPM) },
+                         speed: create_qty(qty: 1600, units: RPM) },
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
-                            speed: create_qty(qty: 1000, units: TIMES_G) },
+                             speed: create_qty(qty: 1000, units: TIMES_G) },
     thermocycler_model: TestThermocycler::MODEL,
     program_name: 'CDC_TaqPath_CG',
     qpcr: true
@@ -177,7 +174,7 @@ COV2 = 'COV2'.freeze
 
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
-        object_type: composition.input(WATER).object_type
+        object_type: composition.input(WATER).suggested_ot
       )
 
       composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
@@ -199,7 +196,7 @@ COV2 = 'COV2'.freeze
         components: retrieve_list
       )
 
-      show_block_1a = shake(items: vortex_list,
+      show_block_1a = shake(items: vortex_list.map(&:display_name),
                             type: Vortex::NAME)
 
       adj_multiplier = plate1.get_non_empty.length
@@ -241,21 +238,20 @@ COV2 = 'COV2'.freeze
         name: op.temporary[:robot_model],
         protocol: self
       )
-
       display_hash(
         title: 'Set Up and Run Robot',
         hash_to_show: use_robot(program: drgprogram,
                                 robot: drgrobot,
-                                items: [plate1,
-                                        composition.input(MASTER_MIX)])
+                                items: [composition.input(COV1).display_name,
+                                        composition.input(MASTER_MIX).display_name])
       )
 
       display_hash(
         title: 'Set Up and Run Robot',
         hash_to_show: use_robot(program: drgprogram2,
                                 robot: drgrobot,
-                                items: [plate2,
-                                        composition.input(MASTER_MIX_2)])
+                                items: [composition.input(COV2).display_name,
+                                        composition.input(MASTER_MIX_2).display_name])
       )
 
       program = LiquidRobotProgramFactory.build(
@@ -267,12 +263,14 @@ COV2 = 'COV2'.freeze
         name: op.temporary[:robot_model],
         protocol: self
       )
-
+  
       display_hash(
         title: 'Set Up and Run Robot',
-        hash_to_show: use_robot(program: program,
-                                robot: robot, items: [input_plate,
-                                                      plate1, plate2])
+        hash_to_show: use_robot(
+          program: program,
+          robot: robot, items: [composition.input(POOLED_PLATE),
+                                composition.input(COV1).display_name,
+                                composition.input(COV2).display_name])
       )
 
       association_map = one_to_one_association_map(from_collection: input_plate)
@@ -315,19 +313,22 @@ COV2 = 'COV2'.freeze
 
       show_block_3a = []
       show_block_3a.append(seal_plate(
-        [plate1, plate2], seal: consumables.input(AREA_SEAL)
+        [composition.input(COV1).display_name,
+         composition.input(COV2).display_name], seal: consumables.input(AREA_SEAL)
       ))
 
       show_block_3b = []
       show_block_3b.append(shake(
-        items: [plate1, plate2],
+        items: [composition.input(COV1).display_name,
+                composition.input(COV2).display_name],
         speed: temporary_options[:shaker_parameters][:speed],
         time: temporary_options[:shaker_parameters][:time]
       ))
 
       show_block_3c = []
       show_block_3c.append(spin_down(
-        items: [plate1, plate2],
+        items: [composition.input(COV1).display_name,
+                composition.input(COV2).display_name],
         speed: temporary_options[:centrifuge_parameters][:speed],
         time: temporary_options[:centrifuge_parameters][:time]
       ))

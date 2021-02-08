@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -24,9 +24,8 @@ needs 'PCR Protocols/RunThermocycler'
 
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -62,25 +61,31 @@ class Protocol
          input_name: COV1,
          qty: 10, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         suggested_ot: PLATE_384_WELL
        },
        {
         input_name: COV2,
         qty: 10, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: PLATE_384_WELL
+        suggested_ot: PLATE_384_WELL
+      },
+      {
+        input_name: POOLED_PLATE,
+        qty: nil, units: MICROLITERS,
+        sample_name: 'Pooled Specimens',
+        suggested_ot: PLATE_384_WELL
       },
       {
         input_name: MASTER_MIX,
         qty: 30, units: MICROLITERS,
         sample_name: MASTER_MIX,
-        object_type: TEST_TUBE
+        suggested_ot: TEST_TUBE
       },
       {
         input_name: WATER,
         qty: 20, units: MICROLITERS,
         sample_name: WATER,
-        object_type: 'Reagent Bottle'
+        suggested_ot: 'Reagent Bottle'
       }
     ]
   end
@@ -161,28 +166,31 @@ end
 
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
-        object_type: composition.input(WATER).object_type
+        object_type: composition.input(WATER).suggested_ot
       )
 
       composition.input(COV1).item = op.input(COV1).collection
       composition.input(COV2).item = op.input(COV2).collection
+      composition.input(POOLED_PLATE).item = op.output(POOLED_PLATE).collection
       input_plate1 = composition.input(COV1).item
       input_plate2 = composition.input(COV2).item
       output_plate = op.output(POOLED_PLATE).collection
+      out_display = composition.input(POOLED_PLATE).display_name
 
       retrieve_list = reject_components(
         list_of_rejections: [POOLED_PLATE, MASTER_MIX, COV1, COV2],
         components: composition.components
       )
 
+
       show_retrieve_parts(retrieve_list + consumables.consumables)
 
       vortex_list = reject_components(
-        list_of_rejections: [WATER, COV1, COV2, MASTER_MIX],
+        list_of_rejections: [WATER, COV1, COV2, MASTER_MIX, POOLED_PLATE],
         components: retrieve_list
       )
 
-      show_block_1a = shake(items: vortex_list,
+      show_block_1a = shake(items: vortex_list.map(&:display_name),
                             type: Vortex::NAME)
 
       adj_multiplier = input_plate1.get_non_empty.length
@@ -195,17 +203,17 @@ end
                                          adjustment_multiplier: adj_multiplier,
                                          mm_container: consumables.input(TEST_TUBE))
 
-      show_block_1b = []
       show_block_1b += label_items(
-        objects: [consumables.input(MICRO_TUBE)],
-        labels: [composition.input(MASTER_MIX).item]
+        objects: [consumables.input(MICRO_TUBE),
+                  consumables.input(PLATE_384_WELL)],
+        labels: [composition.input(MASTER_MIX).item,
+                 out_display]
       )
 
       display_hash(
         title: 'Prepare for Procedure',
         hash_to_show: [
           show_block_1a,
-          get_and_label_new_plate(output_plate),
           show_block_1b
         ]
       )
@@ -224,7 +232,8 @@ end
         title: 'Set Up and Run Robot',
         hash_to_show: use_robot(program: drgprogram,
                                 robot: drgrobot,
-                                items: [composition.input(MASTER_MIX), output_plate])
+                                items: [composition.input(MASTER_MIX).display_name,
+                                        out_display])
       )
 
       program = LiquidRobotProgramFactory.build(
@@ -239,27 +248,34 @@ end
 
       display_hash(
         title: 'Set Up and Run Robot',
-        hash_to_show: use_robot(program: program,
-                                robot: robot, items: [input_plate1,
-                                                      input_plate2,
-                                                      output_plate])
+        hash_to_show: use_robot(
+          program: program,
+          robot: robot, items: [composition.input(COV1).display_name,
+                                composition.input(COV2).display_name,
+                                out_display]
+        )
       )
 
       association_map = one_to_one_association_map(from_collection: input_plate1)
 
       copy_wells(from_collection: input_plate1,
-                to_collection: output_plate,
-                association_map: association_map)
+                 to_collection: output_plate,
+                 association_map: association_map)
 
-      associate_transfer_collection_to_collection(from_collection: input_plate1,
-                                                  to_collection: output_plate,
-                                                  association_map: association_map,
-                                                  transfer_vol: composition.input(COV1).volume_hash)
+      associate_transfer_collection_to_collection(
+        from_collection: input_plate1,
+        to_collection: output_plate,
+        association_map: association_map,
+        transfer_vol: composition.input(COV1).volume_hash
+      )
 
-      associate_transfer_collection_to_collection(from_collection: input_plate2,
-                                                  to_collection: output_plate,
-                                                  association_map: association_map,
-                                                  transfer_vol: composition.input(COV2).volume_hash)
+      associate_transfer_collection_to_collection(
+        from_collection: input_plate2,
+        to_collection: output_plate,
+        association_map: association_map,
+        transfer_vol: composition.input(COV2).volume_hash
+      )
+
       mm = composition.input(MASTER_MIX)
       associate_transfer_item_to_collection(
         from_item: mm.item,
@@ -271,23 +287,29 @@ end
       kit.remove_volume(required_reactions)
 
       show_block_3a = []
-      show_block_3a.append(seal_plate(
-        [output_plate], seal: consumables.input(AREA_SEAL)
-      ))
+      show_block_3a.append(
+        seal_plate(
+          [out_display], seal: consumables.input(AREA_SEAL)
+        )
+      )
 
       show_block_3b = []
-      show_block_3b.append(shake(
-        items: [output_plate],
-        speed: temporary_options[:shaker_parameters][:speed],
-        time: temporary_options[:shaker_parameters][:time]
-      ))
+      show_block_3b.append(
+        shake(
+          items: [out_display],
+          speed: temporary_options[:shaker_parameters][:speed],
+          time: temporary_options[:shaker_parameters][:time]
+        )
+      )
 
       show_block_3c = []
-      show_block_3c.append(spin_down(
-        items: [output_plate],
-        speed: temporary_options[:centrifuge_parameters][:speed],
-        time: temporary_options[:centrifuge_parameters][:time]
-      ))
+      show_block_3c.append(
+        spin_down(
+          items: [out_display],
+          speed: temporary_options[:centrifuge_parameters][:speed],
+          time: temporary_options[:centrifuge_parameters][:time]
+        )
+      )
 
       display_hash(
         title: 'Prepare for Thermocycler',

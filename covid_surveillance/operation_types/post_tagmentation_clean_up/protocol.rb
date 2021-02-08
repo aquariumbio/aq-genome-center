@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -24,9 +24,8 @@ needs 'PCR Protocols/RunThermocycler'
 
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -58,7 +57,7 @@ class Protocol
          input_name: POOLED_PLATE,
          qty: nil, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: PLATE_384_WELL
+         suggested_ot: PLATE_384_WELL
        }
     ]
   end
@@ -138,6 +137,7 @@ end
 
       composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
       plate = composition.input(POOLED_PLATE).item
+      plate_display = composition.input(POOLED_PLATE).display_name
 
       show_retrieve_parts(composition.components + consumables.consumables)
 
@@ -152,7 +152,7 @@ end
       show_block_1.append(
         {
           display: seal_plate(
-            [plate], seal: consumables.input(AREA_SEAL)
+            [plate_display], seal: consumables.input(AREA_SEAL)
           ),
           type: 'note'
         }
@@ -160,7 +160,7 @@ end
 
       show_block_1.append(
         {
-          display: shake(items: vortex_list,
+          display: shake(items: vortex_list.map(&:display_name),
                          type: Vortex::NAME),
           type: 'note'
         }
@@ -169,7 +169,7 @@ end
       show_block_1.append(
         { 
           display: spin_down(
-            items: [plate],
+            items: [plate_display],
             speed: temporary_options[:centrifuge_parameters][:speed],
             time: temporary_options[:centrifuge_parameters][:time]
           ),
@@ -205,7 +205,9 @@ end
 
       show_block_1.append(
         use_robot(program: drgprogram,
-                  robot: drgrobot, items: [plate, composition.input(ST2_HT)])
+                  robot: drgrobot,
+                  items: [plate_display,
+                          composition.input(ST2_HT).display_name])
       )
 
       associate_transfer_item_to_collection(
@@ -220,7 +222,7 @@ end
       show_block_2.append(
         {
           display: seal_plate(
-            [plate], seal: consumables.input(AREA_SEAL)
+            [plate_display], seal: consumables.input(AREA_SEAL)
           ),
           type: 'note'
         }
@@ -228,7 +230,7 @@ end
 
       show_block_1.append(
         {
-          display: shake(items: vortex_list,
+          display: shake(items: vortex_list.map(&:display_name),
                          type: Vortex::NAME),
           type: 'note'
         }
@@ -237,7 +239,7 @@ end
       show_block_2.append(
         {
           display: show_incubate_items(
-            items: [plate],
+            items: [plate_display],
             time: temporary_options[:incubation_params][:time],
             temperature: temporary_options[:incubation_params][:temperature]
           ),
@@ -248,7 +250,7 @@ end
       show_block_2.append(
         { 
           display: spin_down(
-            items: [plate],
+            items: [plate_display],
             speed: temporary_options[:centrifuge_parameters][:speed],
             time: temporary_options[:centrifuge_parameters][:time]
           ),
@@ -257,69 +259,23 @@ end
       )
 
       show_block_2.append(
-        {display: place_on_magnet(plate),
-         type: 'note'})
+        { display: place_on_magnet(plate_display),
+          type: 'note' }
+      )
 
-      show_block_2.append( 
-        use_robot(program: program,
+      show_block_2.append(
+        use_robot(
+          program: program,
           robot: robot,
-          items: [plate])
+          items: [plate_display]
+        )
       )
 
       show_block_3 = []
-      show_block_3.append(use_robot(program: drgprogram2,
-                                robot: drgrobot,
-                                items: [plate, composition.input(TWB_HT)]))
-
-      associate_transfer_item_to_collection(
-        from_item: composition.input(TWB_HT).item,
-        to_collection: plate,
-        association_map: association_map,
-        transfer_vol: composition.input(TWB_HT).volume_hash
-      )
-
-      show_block_3.append(
-        {
-          display: seal_plate(
-            [plate], seal: consumables.input(AREA_SEAL)
-          ),
-          type: 'note'
-        }
-      )
-
-      show_block_3.append(
-        {
-          display: shake(items: vortex_list,
-                         type: Vortex::NAME),
-          type: 'note'
-        }
-      )
-
-      show_block_3.append(
-        { 
-          display: spin_down(
-            items: [plate],
-            speed: temporary_options[:centrifuge_parameters][:speed],
-            time: temporary_options[:centrifuge_parameters][:time]
-          ),
-          type: 'note'
-        }
-      )
-
-      show_block_3.append({ display: place_on_magnet(plate),
-                           type: 'note' })
-
-      show_block_2.append( 
-        use_robot(program: program,
-          robot: robot,
-          items: [plate])
-      )
-
-      show_block_4 = []
-      show_block_4.append(use_robot(
+      show_block_3.append(use_robot(
         program: drgprogram2,
         robot: drgrobot,
-        items: [plate, composition.input(TWB_HT)]
+        items: [plate_display, composition.input(TWB_HT).display_name]
       ))
 
       associate_transfer_item_to_collection(
@@ -329,10 +285,66 @@ end
         transfer_vol: composition.input(TWB_HT).volume_hash
       )
 
+      show_block_3.append(
+        {
+          display: seal_plate(
+            [plate_display],
+            seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_3.append(
+        {
+          display: shake(items: vortex_list.map(&:display_name),
+                         type: Vortex::NAME),
+          type: 'note'
+        }
+      )
+
+      show_block_3.append(
+        { 
+          display: spin_down(
+            items: [plate_display],
+            speed: temporary_options[:centrifuge_parameters][:speed],
+            time: temporary_options[:centrifuge_parameters][:time]
+          ),
+          type: 'note'
+        }
+      )
+
+      show_block_3.append({ display: place_on_magnet(plate_display),
+                            type: 'note' })
+
+      show_block_2.append( 
+        use_robot(
+          program: program,
+          robot: robot,
+          items: [plate_display]
+        )
+      )
+
+      show_block_4 = []
+      show_block_4.append(
+        use_robot(
+          program: drgprogram2,
+          robot: drgrobot,
+          items: [plate_display, composition.input(TWB_HT).display_name]
+        )
+      )
+
+      associate_transfer_item_to_collection(
+        from_item: composition.input(TWB_HT).item,
+        to_collection: plate,
+        association_map: association_map,
+        transfer_vol: composition.input(TWB_HT).volume_hash
+      )
+
       show_block_4.append(
         {
           display: seal_plate(
-            [plate], seal: consumables.input(AREA_SEAL)
+            [plate_display], seal: consumables.input(AREA_SEAL)
           ),
           type: 'note'
         }
@@ -340,7 +352,7 @@ end
 
       show_block_4.append(
         {
-          display: shake(items: vortex_list,
+          display: shake(items: vortex_list.map(&:display_name),
                          type: Vortex::NAME),
           type: 'note'
         }
@@ -349,7 +361,7 @@ end
       show_block_4.append(
         { 
           display: spin_down(
-            items: [plate],
+            items: [plate_display],
             speed: temporary_options[:centrifuge_parameters][:speed],
             time: temporary_options[:centrifuge_parameters][:time]
           ),
@@ -357,8 +369,12 @@ end
         }
       )
 
-      show_block_4.append({ display: place_on_magnet(plate),
-        type: 'note' })
+      show_block_4.append(
+        { 
+          display: place_on_magnet(plate_display),
+          type: 'note'
+        }
+      )
 
       display_hash(title: 'Perform the following steps',
                    hash_to_show: show_block_1)

@@ -14,7 +14,7 @@ needs 'Covid Surveillance/AssociationKeys'
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -22,8 +22,8 @@ needs 'Collection Management/CollectionActions'
 
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 class Protocol
   include PlanParams
@@ -53,16 +53,13 @@ class Protocol
        {
          input_name: POOLED_PLATE,
          qty: 4.58, units: MICROLITERS,
-         sample_name: nil,
-         object_type: nil,
-         notes: 'na'
+         sample_name: nil
        },
        {
          input_name: WATER,
          qty: 24, units: MICROLITERS,
          sample_name: WATER,
-         object_type: 'Reagent Bottle',
-         notes: 'na'
+         suggested_ot: 'Reagent Bottle'
       }
     ]
   end
@@ -148,10 +145,11 @@ end
       )
 
       composition.input(POOLED_PLATE).item = plate
+      plate_display = composition.input(POOLED_PLATE).display_name
 
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
-        object_type: composition.input(WATER).object_type
+        object_type: composition.input(WATER).suggested_ot
       )
 
       retrieve_items = reject_components(
@@ -165,16 +163,15 @@ end
       show_retrieve_parts(retrieve_items + consumables.consumables)
 
       vortex_list = [composition.input(ITB), composition.input(RSB_HT)]
-  
-      show_block_1a = (shake(items: vortex_list,
-                                 type: Vortex::NAME))
 
+      show_block_1a = (shake(items: vortex_list.map(&:display_name),
+                             type: Vortex::NAME))
 
       show_block_1b = prepare_etoh(comp: composition.input(ETOH), water: composition.input(WATER))
 
-      show_block_1c = place_on_magnet(plate, time_min: 3)
+      show_block_1c = place_on_magnet(plate_display, time_min: 3)
       show_block_1d = spin_down(
-        items: [plate],
+        items: [plate_display],
         speed: temporary_options[:centrifuge_parameters][:speed],
         time: temporary_options[:centrifuge_parameters][:time]
       )
@@ -207,7 +204,7 @@ end
         program: mosquito_program,
         robot: mosquito_robot,
         items: [consumables.input(PLATE),
-                composition.input(POOLED_PLATE).item]
+                plate_display]
       )
 
       show_block_2b = pipet(volume: {qty: 55, units: MICROLITERS},
@@ -238,7 +235,7 @@ end
         transfer_vol: composition.input(POOLED_PLATE).volume_hash)
 
       show_block_3a = shake(
-        items: [output_pool, composition.input(ITB)],
+        items: [output_pool, composition.input(ITB).display_name],
         speed: temporary_options[:shaker_parameters][:speed],
         time: temporary_options[:shaker_parameters][:time]
       )
@@ -368,9 +365,11 @@ end
 
     show_block = ["Prepare 80% EtOH from Absolute EtOH #{comp.item}"]
     show_block.append(pipet(volume: oh_vol,
-                            source: comp, destination: 'reagent bottle'))
+                            source: comp.display_name,
+                            destination: 'reagent bottle'))
     show_block.append(pipet(volume: water_vol,
-                            source: water, destination: 'reagent bottle'))
+                            source: water.display_name,
+                            destination: 'reagent bottle'))
     show_block
   end
 

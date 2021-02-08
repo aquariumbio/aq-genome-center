@@ -13,7 +13,7 @@ needs 'Covid Surveillance/SampleConstants'
 needs 'Covid Surveillance/AssociationKeys'
 needs 'Liquid Robot Helper/RobotHelper'
 
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
@@ -22,8 +22,8 @@ needs 'Collection Management/CollectionActions'
 needs 'Container/KitHelper'
 needs 'Kits/KitContents'
 
-needs 'ConsumableLibs/Consumables'
-needs 'ConsumableLibs/ConsumableDefinitions'
+needs 'Consumable Libs/Consumables'
+needs 'Consumable Libs/ConsumableDefinitions'
 
 needs 'Covid Surveillance/CovidSurveillanceHelper'
 
@@ -66,61 +66,61 @@ class Protocol
          input_name: POOLED_PLATE,
          qty: 140, units: MICROLITERS,
          sample_name: 'Pooled Specimens',
-         object_type: '96-Well Plate'
+         suggested_ot: '96-Well Plate'
        },
        {
         input_name: POOLED_PLATE_2,
         qty: 140, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: '96-Well Plate'
+        suggested_ot: '96-Well Plate'
        },
        {
          input_name: ETHANOL,
          qty: 560, units: MICROLITERS,
          sample_name: ETHANOL,
-         object_type: 'Reagent Bottle'
+         suggested_ot: 'Reagent Bottle'
        },
        {
         input_name: AVL_AVE_CARRIER,
         qty: 560, units: MICROLITERS,
         sample_name: AVL_AVE_CARRIER,
-        object_type: 'Reagent Bottle'
+        suggested_ot: 'Reagent Bottle'
       },
       {
         input_name: EXTRACTION_PLATE,
         qty: nil, units: nil,
         sample_name: 'Pooled Specimens',
-        object_type: '96-Well Plate'
+        suggested_ot: '96-Well Plate'
       },
       {
         input_name: EXTRACTION_PLATE_2,
         qty: nil, units: nil,
         sample_name: 'Pooled Specimens',
-        object_type: '96-Well Plate'
+        suggested_ot: '96-Well Plate'
       },
       {
         input_name: SBLOCK,
         qty: 630, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: DEEP_PLATE_96_WELL
+        suggested_ot: DEEP_PLATE_96_WELL
       },
       {
         input_name: SBLOCK_2,
         qty: 630, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
-        object_type: DEEP_PLATE_96_WELL
+        suggested_ot: DEEP_PLATE_96_WELL
       },
       {
         input_name: QIAAMP_PLATE,
         qty: nil, units: nil,
         sample_name: 'Pooled Specimens',
-        object_type: QIAAMP_PLATE
+        suggested_ot: QIAAMP_PLATE
       },
       {
         input_name: QIAAMP_PLATE_2,
         qty: nil, units: nil,
         sample_name: 'Pooled Specimens',
-        object_type: QIAAMP_PLATE
+        suggested_ot: QIAAMP_PLATE
       }
     ]
   end
@@ -166,7 +166,8 @@ class Protocol
   def default_operation_params
     {
       centrifuge_parameters: { time: create_qty(qty: 4, units: MINUTES),
-                               speed: create_qty(qty: 5788, units: TIMES_G) },
+                               speed: create_qty(qty: 5788, units: TIMES_G),
+                               type: Qiagenks::NAME },
       incubation_params: { time: create_qty(qty: 10, units: MINUTES),
                            temperature: create_qty(qty: 'room temperature',
                                                    units: '') },
@@ -216,13 +217,13 @@ class Protocol
       composition.input(POOLED_PLATE_2).item = plate_2
       composition.input(ETHANOL).item = find_random_item(
         sample: composition.input(ETHANOL).sample,
-        object_type: composition.input(ETHANOL).object_type
+        object_type: composition.input(ETHANOL).suggested_ot
       )
 
       retrieve_parts = reject_components(
         components: composition.components,
         list_of_rejections: [AVL_AVE_CARRIER, EXTRACTION_PLATE, EXTRACTION_PLATE_2,
-                             QIAAMP_PLATE, SBLOCK, SBLOCK_2]
+                             QIAAMP_PLATE, QIAAMP_PLATE_2, SBLOCK, SBLOCK_2]
       )
 
       show_retrieve_parts(retrieve_parts + consumables.consumables)
@@ -261,9 +262,9 @@ class Protocol
 
       # Label Sblocks
       show_block_1.append(
-        [ { display: get_and_label_new_plate(composition.input(SBLOCK)),
+        [ { display: get_and_label_new_plate(composition.input(SBLOCK).item),
             type: 'note' },
-          { display: get_and_label_new_plate(composition.input(SBLOCK_2)),
+          { display: get_and_label_new_plate(composition.input(SBLOCK_2).item),
             type: 'note'}
         ]
       )
@@ -362,9 +363,9 @@ class Protocol
 
       # Label Qiam spin plates
       show_block_2.append(
-        [ { display: get_and_label_new_plate(composition.input(QIAAMP_PLATE)),
+        [ { display: get_and_label_new_plate(composition.input(QIAAMP_PLATE).item),
             type: 'note' },
-          { display: get_and_label_new_plate(composition.input(QIAAMP_PLATE_2)),
+          { display: get_and_label_new_plate(composition.input(QIAAMP_PLATE_2).item),
             type: 'note'}
         ]
       )
@@ -449,10 +450,11 @@ class Protocol
       show_block_4.append(
         {
           display: spin_down(
-            items: [composition.input(QIAAMP_PLATE),
-                    composition.input(QIAAMP_PLATE_2)],
+            items: [composition.input(QIAAMP_PLATE).item,
+                    composition.input(QIAAMP_PLATE_2).item],
             speed: temporary_options[:centrifuge_parameters][:speed],
-            time: temporary_options[:centrifuge_parameters][:time]
+            time: temporary_options[:centrifuge_parameters][:time],
+            type: temporary_options[:centrifuge_parameters][:type]
           ),
           type: 'note'
         }
@@ -494,10 +496,11 @@ class Protocol
       show_block_4.append(
         {
           display: spin_down(
-            items: [composition.input(QIAAMP_PLATE),
-                    composition.input(QIAAMP_PLATE_2)],
+            items: [composition.input(QIAAMP_PLATE).item,
+                    composition.input(QIAAMP_PLATE_2).item],
             speed: temporary_options[:centrifuge_parameters][:speed],
-            time: temporary_options[:centrifuge_parameters][:time]
+            time: temporary_options[:centrifuge_parameters][:time],
+            type: temporary_options[:centrifuge_parameters][:type]
           ),
           type: 'note'
         }
@@ -551,10 +554,11 @@ class Protocol
       show_block5.append(
         {
           display: spin_down(
-            items: [composition.input(QIAAMP_PLATE),
-                    composition.input(QIAAMP_PLATE_2)],
+            items: [composition.input(QIAAMP_PLATE).item,
+                    composition.input(QIAAMP_PLATE_2).item],
             speed: temporary_options[:centrifuge_parameters][:speed],
-            time: temporary_options[:centrifuge_parameters][:time]
+            time: temporary_options[:centrifuge_parameters][:time],
+            type: temporary_options[:centrifuge_parameters][:type]
           ),
           type: 'note'
         }
@@ -577,10 +581,11 @@ class Protocol
       show_block5.append(
         {
           display: spin_down(
-            items: [composition.input(QIAAMP_PLATE),
-                    composition.input(QIAAMP_PLATE_2)],
+            items: [composition.input(QIAAMP_PLATE).item,
+                    composition.input(QIAAMP_PLATE_2).item],
             speed: temporary_options[:centrifuge_parameters][:speed],
-            time: create_qty(qty: 10, units: MINUTES)
+            time: create_qty(qty: 10, units: MINUTES),
+            type: temporary_options[:centrifuge_parameters][:type]
           ),
           type: 'note'
         }
@@ -593,7 +598,7 @@ class Protocol
 
       show_block6 = []
 
-      extraction_plate = composition.input(EXTRACTION_PLATE).object_type
+      extraction_plate = composition.input(EXTRACTION_PLATE).suggested_ot
 
       composition.input(EXTRACTION_PLATE).item =
         Collection.new_collection(extraction_plate)
@@ -602,9 +607,9 @@ class Protocol
 
       # Label Qiam spin plates
       show_block6.append(
-        [ { display: get_and_label_new_plate(composition.input(EXTRACTION_PLATE)),
+        [ { display: get_and_label_new_plate(composition.input(EXTRACTION_PLATE).item),
             type: 'note' },
-          { display: get_and_label_new_plate(composition.input(EXTRACTION_PLATE_2)),
+          { display: get_and_label_new_plate(composition.input(EXTRACTION_PLATE_2).item),
             type: 'note'}
         ]
       )
@@ -646,7 +651,7 @@ class Protocol
           display: show_incubate_items(
             items: [composition.input(EXTRACTION_PLATE_2),
                     composition.input(EXTRACTION_PLATE)],
-            time: temporary_options[:incubation_params][:time],
+            time: temporary_options[:incubation_params][:temperature],
             temperature: create_qty(qty: 1, units: MINUTES)
           ),
           type: 'note'
@@ -656,10 +661,11 @@ class Protocol
       show_block6.append(
         {
           display: spin_down(
-            items: [composition.input(EXTRACTION_PLATE),
-                    composition.input(EXTRACTION_PLATE_2)],
+            items: [composition.input(EXTRACTION_PLATE).item,
+                    composition.input(EXTRACTION_PLATE_2).item],
             speed: temporary_options[:centrifuge_parameters][:speed],
-            time: create_qty(qty: 4, units: MINUTES)
+            time: create_qty(qty: 4, units: MINUTES),
+            type: temporary_options[:centrifuge_parameters][:type]
           ),
           type: 'note'
         }
@@ -718,10 +724,11 @@ class Protocol
     show_block.append(
       {
         display: spin_down(
-          items: [composition.input(SBLOCK),
-                  composition.input(SBLOCK_2)],
+          items: [composition.input(SBLOCK).item,
+                  composition.input(SBLOCK_2).item],
           speed: temporary_options[:centrifuge_parameters][:speed],
-          time: temporary_options[:centrifuge_parameters][:time]
+          time: temporary_options[:centrifuge_parameters][:time],
+          type: temporary_options[:centrifuge_parameters][:type]
         ),
         type: 'note'
       }

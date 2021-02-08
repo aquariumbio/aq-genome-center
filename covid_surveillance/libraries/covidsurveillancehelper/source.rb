@@ -4,15 +4,14 @@
 
 needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
-needs 'CompositionLibs/AbstractComposition'
+needs 'Composition Libs/Composition'
 needs 'CompositionLibs/CompositionHelper'
-needs 'Standard Libs/DisplayHelper'
-
+needs 'Standard Libs/TextDisplayHelper'
 
 module CovidSurveillanceHelper
   include KitHelper
   include CompositionHelper
-  include DisplayHelper
+  include TextDisplayHelper
 
   # coordinates finding and setting up a kit with the composition libs
   #
@@ -25,9 +24,10 @@ module CovidSurveillanceHelper
                             components:,
                             consumables:)
     kit = find_kit(kit_sample_name, num_reactions_required)
+    all_comps = components + kit.components
 
     composition = CompositionFactory.build(
-      components: components.append(kit.components).flatten
+      component_data: all_comps
     )
 
     all_cons = consumables + kit.consumables
@@ -55,10 +55,10 @@ module CovidSurveillanceHelper
 
   def master_mix_handler(components:, mm:, mm_container:, adjustment_multiplier: nil)
     mm.item = make_item(sample: mm.sample,
-                        object_type: mm.object_type)
+                        object_type: mm.suggested_ot)
     show_block = label_items(
-      objects: [mm_container],
-      labels: ["#{mm.input_name}-#{mm.item}"]
+      objects: [mm.item.object_type.name],
+      labels: [mm.display_name]
     )
 
     if adjustment_multiplier
@@ -85,11 +85,6 @@ module CovidSurveillanceHelper
     show_block.append(
       { display: robot.select_program_template(program: program),
         type: 'note' }
-    )
-
-    show_block.append(
-      { display: robot.setup_program_image(program: program),
-        type: 'image' }
     )
 
     items.each do |item|
