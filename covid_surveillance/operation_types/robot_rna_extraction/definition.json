@@ -14,26 +14,14 @@
       "part": null,
       "array": null,
       "routing": null
-    },
-    {
-      "name": "Pooled Sample Plate 2",
-      "part": true,
-      "array": null,
-      "routing": "PP"
     }
   ],
   "outputs": [
     {
-      "name": "Extracted Sample Plate",
+      "name": "Pooled Sample Plate",
       "part": true,
       "array": null,
       "routing": "P"
-    },
-    {
-      "name": "Extracted Sample Plate 2",
-      "part": true,
-      "array": null,
-      "routing": "PP"
     }
   ],
   "on_the_fly": null,

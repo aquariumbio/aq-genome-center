@@ -1,35 +1,29 @@
 {
-  "name": "Tagment PCR Amplicons",
+  "name": "Pool and Dilute Libraries",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "COV1",
+      "name": "Pooled Sample Plate",
       "part": true,
       "array": false,
-      "routing": "P1"
+      "routing": "P"
     },
     {
       "name": "Options",
       "part": false,
       "array": false,
       "routing": null
-    },
-    {
-      "name": "COV2",
-      "part": true,
-      "array": false,
-      "routing": "P2"
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
-      "part": true,
+      "name": "Pooled Library",
+      "part": false,
       "array": false,
-      "routing": "P"
+      "routing": "P1"
     }
   ],
   "on_the_fly": false,
-  "user_id": 2
+  "user_id": 1
 }

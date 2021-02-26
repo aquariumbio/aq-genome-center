@@ -19,7 +19,7 @@
       "name": "Index Adapter",
       "part": true,
       "array": null,
-      "routing": "IA"
+      "routing": "I"
     }
   ],
   "outputs": [
@@ -31,5 +31,5 @@
     }
   ],
   "on_the_fly": false,
-  "user_id": 1
+  "user_id": 2
 }
