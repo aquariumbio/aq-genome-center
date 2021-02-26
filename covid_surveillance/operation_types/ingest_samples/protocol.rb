@@ -103,13 +103,9 @@ class Protocol
       default_operation_params: default_operation_params
     )
 
-    #operations.make
-
     operations.each do |op|
       output_plate = Collection.new_collection(ObjectType.find_by_name('96-Well Plate'))
       op.output(POOLED_PLATE).set(item: output_plate)
-      
-      
 
       temporary_options = op.temporary[:options]
 
