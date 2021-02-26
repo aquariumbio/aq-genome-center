@@ -38,7 +38,7 @@ class Protocol
   ################ Composition Parts ####################
 
   def components
-    [
+    [ 
        {
          input_name: PLATE_A,
          qty: 8.5, units: MICROLITERS,
