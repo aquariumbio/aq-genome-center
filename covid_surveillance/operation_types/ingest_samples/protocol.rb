@@ -132,7 +132,7 @@ class Protocol
 
         incoming_plate_identifier = plate_id if incoming_plate_identifier.nil?
 
-        unless incoming_plate_identifier = plate_id
+        unless incoming_plate_identifier == plate_id
           raise 'CSV is for more than one incoming plate'
         end
 
