@@ -1,18 +1,18 @@
 {
-  "name": "Synthesize First Strand cDNA",
+  "name": "Pool Samples",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "Pooled Sample Plate",
-      "part": true,
-      "array": false,
-      "routing": "P"
+      "name": "Specimen",
+      "part": null,
+      "array": true,
+      "routing": "S"
     },
     {
       "name": "Options",
-      "part": false,
-      "array": false,
+      "part": null,
+      "array": null,
       "routing": null
     }
   ],
@@ -20,10 +20,10 @@
     {
       "name": "Pooled Sample Plate",
       "part": true,
-      "array": false,
+      "array": null,
       "routing": "P"
     }
   ],
-  "on_the_fly": false,
+  "on_the_fly": null,
   "user_id": 1
 }

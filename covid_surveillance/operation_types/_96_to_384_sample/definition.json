@@ -12,25 +12,25 @@
     {
       "name": "Plate B",
       "part": true,
-      "array": false,
+      "array": null,
       "routing": "B"
     },
     {
       "name": "Plate C",
       "part": true,
-      "array": false,
+      "array": null,
       "routing": "C"
     },
     {
       "name": "Plate D",
       "part": true,
-      "array": false,
+      "array": null,
       "routing": "D"
     },
     {
       "name": "Options",
-      "part": false,
-      "array": false,
+      "part": null,
+      "array": null,
       "routing": null
     }
   ],
@@ -38,10 +38,10 @@
     {
       "name": "Pooled Sample Plate",
       "part": true,
-      "array": false,
+      "array": null,
       "routing": "O"
     }
   ],
-  "on_the_fly": false,
-  "user_id": 2
+  "on_the_fly": null,
+  "user_id": 1
 }
