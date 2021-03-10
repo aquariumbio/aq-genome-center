@@ -116,7 +116,7 @@ module CovidSurveillanceHelper
   # @param title 'String' the string of things to show
   # @param has_to_show: 'Array<Hash>' hash to represent each line
   def display_hash(title:, hash_to_show:)
-    many_display(title: title, show_block: hash_to_show)
+    display(title: title, show_block: hash_to_show)
   end
 
   # Instructions to place plate on some magnets

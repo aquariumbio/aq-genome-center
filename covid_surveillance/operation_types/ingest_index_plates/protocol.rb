@@ -169,17 +169,10 @@ class Protocol
         output_plate.set(r, c, new_sample)
       end
 
-      show_block1 = [
-        {
-          display: label_items(objects: [incoming_plate_identifier],
-                               labels: [output_plate]),
-          type: 'note'
-        }
-      ]
-
-      display_hash(
+      display(
         title: 'Ingest Plate',
-        hash_to_show: show_block1
+        show_block: label_items(objects: [incoming_plate_identifier],
+                                labels: [output_plate])
       )
 
 
