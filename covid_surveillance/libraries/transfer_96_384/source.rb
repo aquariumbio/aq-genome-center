@@ -14,7 +14,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
 needs 'Collection Management/CollectionTransfer'
@@ -46,14 +46,14 @@ module Transfer_96_384
   include KitContents
   include AssociationManagement
 
-  def transfer_96_to_384(op, components, plate_name_array, plate_transfer_map)
+  def transfer_96_to_384(op, components, plate_name_array, plate_transfer_map, output_plate_name)
     input_plates = plate_name_array.map{ |ip| op.input(ip).collection }
     set_up_test(input_plates) if debug
 
     composition = CompositionFactory.build(
       component_data: components
     )
-    composition.input(POOLED_PLATE).item = op.output(POOLED_PLATE).collection
+    composition.input(output_plate_name).item = op.output(output_plate_name).collection
 
     plate_comps = []
     plate_name_array.each do |name|
@@ -63,12 +63,22 @@ module Transfer_96_384
 
     temporary_options = op.temporary[:options]
 
+    retrieve_list = reject_components(
+      list_of_rejections: [output_plate_name],
+      components: composition.components
+    )
+
     # SHOW gets the parts in the composition
-    show_retrieve_parts(composition.components)
+    display_hash(
+      title: 'Retrieve Materials',
+      hash_to_show: [
+        { display: 'Retrieve the Following Materials', type: 'note' },
+        { display: create_location_table(retrieve_list), type: 'table' }]
+    )
 
     display_hash(
       title: 'Get and Label Plate',
-      hash_to_show: [get_and_label_new_plate(composition.input(POOLED_PLATE).item)]
+      hash_to_show: [get_and_label_new_item(composition.input(output_plate_name).item)]
     )
 
     program = LiquidRobotProgramFactory.build(
@@ -80,7 +90,7 @@ module Transfer_96_384
       name: nil,
       protocol: nil
     )
-    robot_items = plate_comps + [composition.input(POOLED_PLATE)]
+    robot_items = plate_comps + [composition.input(output_plate_name)]
     display_hash(
       title: 'Set Up and Run Robot',
       hash_to_show: use_robot(program: program,
@@ -89,7 +99,7 @@ module Transfer_96_384
     )
 
     transfer_provenance(plate_transfer_map,
-                        pooled_plate: POOLED_PLATE,
+                        pooled_plate: output_plate_name,
                         comp: composition)
   end
 

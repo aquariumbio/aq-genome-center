@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -24,6 +24,10 @@ needs 'Kits/KitContents'
 
 needs 'Consumable Libs/Consumables'
 needs 'Consumable Libs/ConsumableDefinitions'
+
+needs 'Standard Libs/TestFixtures'
+needs 'Standard Libs/TestMetrics'
+needs 'Standard Libs/ProvenanceFinder'
 
 class Protocol
   include PlanParams
@@ -43,15 +47,31 @@ class Protocol
   include CovidSurveillanceHelper
   include KitContents
   include ConsumableDefinitions
+  include TestFixtures
+  include TestMetrics
+  include ProvenanceFinder
 
  #========== Composition Definitions ==========#
 
   COMPOSITION_KEY = 'composition'
 
-  POOLED_LIBRARY = 'Pooled Library'
+  POOLED_LIBRARY = 'Final Pool'
   KIT_SAMPLE_NAME = 'dsDNA HS Assay Kit'
+
+  OUTPUT_LIBRARY = 'Stock Tube'
+  DIL_10X = '10X Dil of Stock'
+  SEQ_POOL_TUBE = 'Seq. Pool Tube'
+  FINAL_DILUTION = 'Final Dilution'
+
+
+  QBIT_JUICE = 'QBIT Juice'
+  DILUTION = '10X Dil'
+
+  S1 = 'S1'
+  S2 = 'S2'
+
   def components
-    [ 
+    [
       {
         input_name: POOLED_LIBRARY,
         qty: 10, units: MICROLITERS,
@@ -65,23 +85,50 @@ class Protocol
         suggested_ot: 'Reagent Bottle'
      },
      {
-       input_name: RSB_HT,
-       qty: nil, units: MICROLITERS,
-       sample_name: RSB_HT,
-       suggested_ot: 'Reagent Bottle',
-       notes: 'Thaw and Keep on Ice'
+       input_name: WATER,
+       qty: nil, units: nil,
+       sample_name: WATER,
+       suggested_ot: 'Reagent Bottle'
+     },
+     {
+      input_name: OUTPUT_LIBRARY,
+      qty: nil, units: nil,
+      sample_name: nil,
+      suggested_ot: 'Reagent Bottle'
     },
-    ]
+    {
+      input_name: DIL_10X,
+      qty: nil, units: nil,
+      sample_name: nil,
+      suggested_ot: 'Reagent Bottle'
+    },
+    {
+      input_name: SEQ_POOL_TUBE,
+      qty: nil, units: nil,
+      sample_name: nil,
+      suggested_ot: 'Reagent Bottle'
+    },
+    {
+      input_name: FINAL_DILUTION,
+      qty: nil, units: nil,
+      sample_name: nil,
+      suggested_ot: 'Reagent Bottle'
+    }
+   ]
   end
 
   def consumable_data
     [
       {
-        consumable: CONSUMABLES[TEST_TUBE],
+        consumable: CONSUMABLES[STRIP_TUBE8],
         qty: 1, units: 'Each'
       },
       {
         consumable: CONSUMABLES[MICRO_TUBE],
+        qty: 2, units: 'Each'
+      },
+      {
+        consumable: CONSUMABLES[TUBE_5ML],
         qty: 1, units: 'Each'
       }
     ]
@@ -94,7 +141,6 @@ class Protocol
 #   * Associating a JSON-formatted list of key, value pairs to the `Plan`.
 #   * Adding a JSON-formatted list of key, value pairs to an `Operation`
 #     input of type JSON and named `Options`.
-#
 def default_job_params
   {
   }
@@ -136,21 +182,26 @@ end
 
     operations.each_with_index do |op, idx|
       composition, consumables, _kit_ = setup_kit_composition(
-        kit_sample_name: KIT_SAMPLE_NAME,
+        kit_sample_names: [KIT_SAMPLE_NAME],
         num_reactions_required: create_qty(qty:required_reactions, units: 'rxn'),
         components: components,
         consumables: consumable_data
       )
 
-      composition.input(RSB_HT).item = find_random_item(
-        sample: composition.input(RSB_HT).sample,
-        object_type: composition.input(RSB_HT).suggested_ot
+      composition.input(OUTPUT_LIBRARY).item = op.output(OUTPUT_LIBRARY).item
+      composition.input(SEQ_POOL_TUBE).item = op.output(SEQ_POOL_TUBE).item
+      composition.input(DIL_10X).item = op.output(DIL_10X).item
+      composition.input(FINAL_DILUTION).item = op.output(FINAL_DILUTION).item
+
+      composition.input(WATER).item = find_random_item(
+        sample: composition.input(WATER).sample,
+        object_type: composition.input(WATER).suggested_ot
       )
 
       composition.input(POOLED_LIBRARY).item = op.input(POOLED_LIBRARY).item
 
       adj_vol_list = reject_components(
-        list_of_rejections: [POOLED_LIBRARY, MASTER_MIX, RSB_HT],
+        list_of_rejections: [POOLED_LIBRARY, MASTER_MIX, OUTPUT_LIBRARY, DIL_10X, SEQ_POOL_TUBE, FINAL_DILUTION],
         components: composition.components
       )
 
@@ -167,145 +218,258 @@ end
 
       retrieve_list.append(composition.input(POOLED_LIBRARY))
       retrieve_list += consumables.consumables
-    end
 
-    first_composition, consumables = operations.first.temporary[COMPOSITION_KEY]
-    mm_components = [first_composition.input(COMP_B),
-                     first_composition.input(COMP_A)]
+      mm_components = [composition.input(COMP_B),
+                       composition.input(COMP_A)]
 
-    show_block_1a = master_mix_handler(
-      components: mm_components,
-      mm: first_composition.input(MASTER_MIX),
-      adjustment_multiplier: required_reactions,
-      mm_container: consumables.input(TEST_TUBE)
-    )
-
-    show_retrieve_parts(retrieve_list)
-
-    display_hash(
-      title: 'Prepare Items',
-      hash_to_show: [
-        show_block_1a
-      ]
-    )
-
-    sample_list = [consumables.input(QBIT_TUBE),
-                   consumables.input(QBIT_TUBE)]
-    label_list = ['s-1','s-2']
-
-    operations.each do |op|
-      comp, consumables = op.temporary[COMPOSITION_KEY]
-      label_list.append("s-#{comp.input(POOLED_LIBRARY).item}")
-      sample_list.append(consumables.input(QBIT_TUBE))
-    end
-
-    show_block_2a = label_items(
-      objects: sample_list,
-      labels: label_list
-    )
-
-    show_block_2b = pipet(volume: first_composition.input(MASTER_MIX).volume_hash,
-                          source: first_composition.input(MASTER_MIX).display_name,
-                          destination: label_list.join(', '))
-
-    show_block_2c = pipet(volume: first_composition.input(COMP_C).volume_hash,
-                          source: first_composition.input(MASTER_MIX).display_name,
-                          destination: 's-1')
-
-    show_block_2d = pipet(volume: first_composition.input(COMP_D).volume_hash,
-                          source: first_composition.input(MASTER_MIX).display_name,
-                          destination: 's-2')
-
-    show_block_2e = []
-    operations.each do |op|
-      composition, consumables = op.temporary[COMPOSITION_KEY]
-
-      show_block_2e.append(pipet(
-        volume: composition.input(POOLED_LIBRARY).volume_hash,
-        source: first_composition.input(POOLED_LIBRARY),
-        destination: "s-#{composition.input(POOLED_LIBRARY).item}"
-        ))
-    end
-
-    display_hash(
-      title: 'Prepare Test',
-      hash_to_show: [
-        show_block_2a,
-        show_block_2b,
-        show_block_2c,
-        show_block_2d,
-        show_block_2e
-      ]
-    )
-
-    sample_vol = qty_display(operations.first.temporary[COMPOSITION_KEY][0].input(POOLED_LIBRARY).volume_hash)
-    concentrations = show do
-      title 'Run Samples'
-      note 'Go to and turn on Qubit'
-      note "Press 'DNA' --> 'dsDNA' --> 'High Sensisitivity' --> 'Read Standards' "
-      note "Insert <b>s-1</b> and press 'Read Standard'"
-      note "Insert <b>s-2</b> and press 'Read Standard'"
-      separator
-      note "Press 'Run Samples'"
-      note "Set volume to <b>#{sample_vol}"
-      note "Set units to #{NANOGRAMS}/#{MICROLITERS}"
-      note 'Place each sample in th Qubit and press "run"'
-      operations.each do |op|
-        get("number", var: op.id.to_s,
-                      label: "Enter concentration in #{NANOGRAMS}/#{MICROLITERS}",
-                      default: 0)
-      end
-    end
-
-    operations.each do |op|
-      composition, consumables = op.temporary[COMPOSITION_KEY]
-
-      con = concentrations[op.id.to_s.to_sym]
-      con = rand(0.97...3) if debug
-      molarity = con * (10**6) / (600.0 * 400.0)
-      if molarity < target_molarity
-        inspect "Molarity #{molarity}, concentration: #{con}" if debug
-        op.error(:molarity_too_low, 'Molarity too low')
-        op.status = 'error'
-        op.save
-        next
-      end
-
-      volume_sample = target_molarity * target_volume / molarity
-      volume_buffer = target_volume - volume_sample
-
-      if debug
-        inspect "samp: #{volume_sample}, buff: #{volume_buffer}, "\
-                " concentration: #{con}"
-      end
-
-      show_block_3a = label_items(
-        objects: [composition.input(MICRO_TUBE)],
-        labels: [op.output(POOLED_LIBRARY).item]
+      show_block_1a = label_items(
+        objects: [consumables.input(TUBE_5ML), consumables.input(MICRO_TUBE)],
+        labels: [QBIT_JUICE, DILUTION]
       )
 
-      show_block_3b = pipet(
-        volume: create_qty(qty: volume_sample, units: MICROLITERS),
+      show_block_1b = pipet(
+        volume: composition.input(COMP_A).volume_hash,
+        source: composition.input(COMP_A),
+        destination: QBIT_JUICE
+      )
+
+      show_block_1c = pipet(
+        volume: composition.input(COMP_D).volume_hash,
+        source: composition.input(COMP_D),
+        destination: QBIT_JUICE
+      )
+
+      show_block_1d = shake(
+        items: [QBIT_JUICE],
+        type: Vortex::NAME
+      )
+
+      show_block_1e = pipet(
+        volume: create_qty(qty: 90, units: MICROLITERS),
+        source: composition.input(WATER),
+        destination: DILUTION
+      )
+
+      show_block_1f = pipet(
+        volume: create_qty(qty: 10, units: MICROLITERS),
         source: composition.input(POOLED_LIBRARY),
-        destination: op.output(POOLED_LIBRARY).item)
-
-      show_block_3c = pipet(
-        volume: create_qty(qty: volume_buffer, units: MICROLITERS),
-        source: composition.input(RSB_HT),
-        destination: op.output(POOLED_LIBRARY).item
+        destination: DILUTION
       )
+
+      show_retrieve_parts(retrieve_list)
 
       display_hash(
-        title: 'Dilute Library',
+        title: 'Prepare Items',
         hash_to_show: [
-          show_block_3a,
-          show_block_3b,
-          show_block_3c
+          show_block_1a,
+          show_block_1b,
+          show_block_1c,
+          show_block_1d,
+          show_block_1e,
+          show_block_1f
         ]
       )
+
+      show_block_2a = label_items(
+        objects: [consumables.input(QBIT_TUBE),
+                  consumables.input(QBIT_TUBE),
+                  consumables.input(QBIT_TUBE),
+                  consumables.input(QBIT_TUBE),
+                  consumables.input(QBIT_TUBE),
+                  consumables.input(QBIT_TUBE)],
+        labels: [composition.input(OUTPUT_LIBRARY),
+                 S1,
+                 S2,
+                 composition.input(DIL_10X),
+                 composition.input(SEQ_POOL_TUBE),
+                 composition.input(FINAL_DILUTION)]
+      )
+
+      show_block_2b = pipet(
+          volume: create_qty(qty: 198, units: MICROLITERS),
+          source: QBIT_JUICE,
+          destination: composition.input(OUTPUT_LIBRARY)
+        ),
+        pipet(
+          volume: create_qty(qty: 2, units: MICROLITERS),
+          source: composition.input(POOLED_LIBRARY),
+          destination: composition.input(OUTPUT_LIBRARY)
+        )
+
+      show_block_2c = pipet(
+          volume: create_qty(qty: 190, units: MICROLITERS),
+          source: QBIT_JUICE,
+          destination: S1
+        ),
+        pipet(
+          volume: create_qty(qty: 10, units: MICROLITERS),
+          source: composition.input(COMP_B),
+          destination: S1
+        )
+
+      show_block_2d = pipet(
+          volume: create_qty(qty: 190, units: MICROLITERS),
+          source: QBIT_JUICE,
+          destination: S2
+        ),
+        pipet(
+          volume: create_qty(qty: 10, units: MICROLITERS),
+          source: composition.input(COMP_C),
+          destination: S2
+        )
+
+      show_block_2e = pipet(
+          volume: create_qty(qty: 198, units: MICROLITERS),
+          source: QBIT_JUICE,
+          destination: DIL_10X
+        ),
+        pipet(
+          volume: create_qty(qty: 2, units: MICROLITERS),
+          source: DILUTION,
+          destination: DIL_10X
+        )
+
+
+      show_block_2f = pipet_up_and_down([composition.input(OUTPUT_LIBRARY),
+                                         S1,
+                                         S2,
+                                         composition.input(DIL_10X)])
+
+      display(
+        title: 'Add the Following',
+        show_block:[
+          show_block_2a,
+          show_block_2b,
+          show_block_2c,
+          show_block_2d,
+          show_block_2e,
+          show_block_2f
+        ]
+      )
+
+      sample_vol = qty_display(qty: 2, units: MICROLITERS)
+      get_dil_con = show do
+        title "Get #{composition.input(DIL_10X)} concentration"
+        note 'Go to and turn on Qubit'
+        note "Press 'DNA' --> 'dsDNA' --> 'High Sensisitivity' --> 'Read Standards' "
+        note "Insert <b>s-1</b> and press 'Read Standard'"
+        note "Insert <b>s-2</b> and press 'Read Standard'"
+        separator
+        note "Press 'Run Samples'"
+        note "Set volume to <b>#{sample_vol}"
+        note "Set units to #{NANOGRAMS}/#{MICROLITERS}"
+        note "Place #{composition.input(DIL_10X)} in th Qubit and press 'run'"
+        get('number', var: 'number',
+                      label: "Enter concentration in #{NANOGRAMS}/#{MICROLITERS}",
+                      default: 0.0)
+      end
+
+      get_lib_size = show do
+        title 'Get Library Size'
+        note "Get a #{CONSUMABLES[STRIP_TUBE8][:name]}"
+        note pipet(volume: create_qty(qty:2, units: MICROLITERS),
+                   source: composition.input(DIL_10X),
+                   destination: CONSUMABLES[STRIP_TUBE8][:name])
+        note pipet(volume: create_qty(qty:2, units: MICROLITERS),
+                   source: composition.input(SAMPLE_BUFFER),
+                   destination: CONSUMABLES[STRIP_TUBE8][:name])
+        note vortex([CONSUMABLES[STRIP_TUBE8][:name]])
+        note spin_down(items: [CONSUMABLES[STRIP_TUBE8][:name]])
+        note show_incubate_items(items: [CONSUMABLES[STRIP_TUBE8][:name]],
+                                 time: create_qty(qty: 2, units: MINUTES),
+                                 temperature: create_qty(qty: 'Room Temp',
+                                                         units: ''))
+        separator
+        note 'Open <b>2200 Tapestation</b> software on computer'
+        note "<b>#{CONSUMABLES[STRIP_TUBE8][:name]}</b> and <b>Agilent HS D1000 ScreenTape</b> into <b>Agilent Technologies 2200 Tapestation</b>."
+        separator
+        note 'Select Appropriate Well'
+        note 'Press <b>RUN</b>'
+        separator
+        get('number', var: 'number',
+                      label: 'Enter Library Size as measured',
+                      default: 0.0)
+      end
+
+      dil_con = get_dil_con[:number]
+      lib_size = get_lib_size[:number]
+
+      if debug
+        dil_con = rand(400)
+        lib_size = rand(220)
+      end
+
+      dil_mol = molarity(q_bit: dil_con, lib_size: lib_size)
+      composition.input(DIL_10X).item.associate('molarity', dil_mol)
+      composition.input(DIL_10X).item.associate('lib_size', lib_size)
+      composition.input(DIL_10X).item.associate("concentration #{NANOGRAMS}/#{MICROLITERS}", lib_size)
+
+      samp_vol = (3.0 * 40.0)/dil_mol
+      water_vol = 40.0 - samp_vol
+
+      show do
+        title "Create #{composition.input(SEQ_POOL_TUBE)}"
+        note pipet(volume: create_qty(qty: samp_vol, units: MICROLITERS),
+                   source: composition.input(DIL_10X),
+                   destination: composition.input(SEQ_POOL_TUBE))
+        note pipet(volume: create_qty(qty: water_vol, units: MICROLITERS),
+                   source: composition.input(WATER),
+                   destination: composition.input(SEQ_POOL_TUBE))
+      end
+
+      show do
+        title "Create #{composition.input(FINAL_DILUTION)}"
+        note pipet(volume: create_qty(qty: 2, units: MICROLITERS),
+                   source: composition.input(SEQ_POOL_TUBE),
+                   destination: composition.input(FINAL_DILUTION))
+        note pipet(volume: create_qty(qty: 198, units: MICROLITERS),
+                   source: QBIT_JUICE,
+                   destination: composition.input(FINAL_DILUTION))
+      end
+
+      final_con = show do
+        title "Get #{composition.input(FINAL_DILUTION)} concentration"
+        note 'Go to Qubit'
+        note 'Use previously run standards'
+        separator
+        note "Press 'Run Samples'"
+        note "Set volume to <b>#{sample_vol}"
+        note "Set units to #{NANOGRAMS}/#{MICROLITERS}"
+        note "Place #{composition.input(FINAL_DILUTION)} in th Qubit and press 'run'"
+        get('number', var: 'number',
+                      label: "Enter concentration in #{NANOGRAMS}/#{MICROLITERS}",
+                      default: 0.0)
+      end
+
+      store_items([composition.input(SEQ_POOL_TUBE).item,
+                   composition.input(DIL_10X).item,
+                   composition.input(FINAL_DILUTION).item,
+                   composition.input(OUTPUT_LIBRARY).item],
+                   location: 'M20')
+
+      operation_history = OperationHistoryFactory.new.from_item(item_id: composition.input(POOLED_LIBRARY).item)
+
+      upload = operation_history.fetch_data(RNA_EXTRACTION_DATA.to_sym).first
+      text = upload.url.to_s
+      html_text = text.gsub(URI::DEFAULT_PARSER.make_regexp, '<a href="\0">\0</a>').html_safe
+      show do
+        title 'Download CSV'
+        note 'Download the following CSV for use with the Sequencer'
+        note html_text
+      end
+
+      seq_molarity = molarity(q_bit: final_con[:number], lib_size: lib_size)
+
+      composition.input(SEQ_POOL_TUBE).item.associate('molarity', seq_molarity)
+      composition.input(DIL_10X).item.associate('lib_size', lib_size)
+      composition.input(DIL_10X).item.associate("concentration #{NANOGRAMS}/#{MICROLITERS}", lib_size)
     end
 
     {}
+  end
+
+  def molarity(q_bit:, lib_size:)
+    ( q_bit*( (10**3)/1.0 )*(1.0/649.0)*(1.0/lib_size) )*1000.0
   end
 
 end

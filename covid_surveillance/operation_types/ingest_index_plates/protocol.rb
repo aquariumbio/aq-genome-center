@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -53,6 +53,8 @@ class Protocol
   include CovidSurveillanceHelper
   include KitContents
   include ConsumableDefinitions
+  
+  POOLED_PLATE = 'Sample Plate'
 
   def components_data
     []
@@ -82,16 +84,15 @@ class Protocol
   def default_operation_params
     {
       project: 'Covid Surveillance',
-      default_sample_type: 'Nasal swab'
+      default_sample_type: 'Index Adapter Sample'
     }
   end
 
   EXAMPLE_CSV = [
-    ['Plate ID/barcode', 'Well  Position', 'Sample ID', 'Sample Volume (ul)',
-     'Sample type', 'Sample Week', "'Age Range"],
-    ['FSH006Y5', 'A01', 'MN0-0105', '150', 'Nasal swab', '6', '18-27'],
-    ['FSH006Y5', 'A02', 'MN0-01VG', '150', 'Nasal swab', '6', '18-27'],
-    ['FSH006Y5', 'A03', 'MN0-0166', '150', 'Nasal swab', '6', '18-27']
+    ['Plate ID/barcode', 'Well  Position', 'Index Sequence'],
+    ['FSH006Y5', 'A01', 'ACTGTCC'],
+    ['FSH006Y5', 'A02', 'ACGTCCC'],
+    ['FSH006Y5', 'A03', 'TGTTCCA']
   ]
 
 
@@ -105,7 +106,7 @@ class Protocol
 
     operations.each do |op|
       output_plate = Collection.new_collection(ObjectType.find_by_name('96-Well Plate'))
-      op.output(POOLED_PLATE).set(item: output_plate)
+      op.output('Sample Plate').set(item: output_plate)
 
       temporary_options = op.temporary[:options]
 
@@ -124,10 +125,6 @@ class Protocol
         plate_id = row[0]
         well = row[1]
         sample_name = row[2]
-        sample_volume = row[3]
-        sample_type = row[4]
-        sample_week = row[5]
-        sample_age_range = row[6]
         new_sample = nil
 
         incoming_plate_identifier = plate_id if incoming_plate_identifier.nil?
@@ -136,9 +133,7 @@ class Protocol
           raise 'CSV is for more than one incoming plate'
         end
 
-        unless sample_type.present?
-          sample_type = temporary_options[:default_sample_type]
-        end
+        sample_type = temporary_options[:default_sample_type]
 
         if Sample.find_by_name(sample_name).present?
           new_sample = Sample.find_by_name(sample_name)
@@ -146,15 +141,12 @@ class Protocol
           new_sample = Sample.creator(
             {
               sample_type_id: SampleType.find_by_name(sample_type).id,
-              description: "A Sample generated from 'Ingest Samples",
+              description: "A Sample generated from 'Ingest Index Plates'",
               name: sample_name,
               project: temporary_options[:project],
               field_values: [
                 { name: 'Initial Well Location', value: well },
                 { name: 'Incoming Plate ID', value: plate_id },
-                { name: 'Sample Week', value: sample_week },
-                { name: 'Sample Age Range', value: sample_age_range },
-                { name: 'Initial Volume (ul)', value: sample_volume }
               ]
             }, User.find(1)
           )

@@ -7,13 +7,20 @@
       "name": "Specimen",
       "part": null,
       "array": true,
-      "routing": "S"
+      "routing": "S",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "Nasopharyngeal Swab"
+        }
+      ]
     },
     {
       "name": "Options",
       "part": null,
       "array": null,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
@@ -21,7 +28,13 @@
       "name": "Pooled Sample Plate",
       "part": true,
       "array": null,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Nasal swab",
+          "object_type": "96-Well Plate"
+        }
+      ]
     }
   ],
   "on_the_fly": null,

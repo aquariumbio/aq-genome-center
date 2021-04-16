@@ -7,13 +7,20 @@
       "name": "Pooled Sample Plate",
       "part": true,
       "array": false,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Nasal swab",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Options",
       "part": false,
       "array": false,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
@@ -21,9 +28,15 @@
       "name": "Pooled Library",
       "part": false,
       "array": false,
-      "routing": "P1"
+      "routing": "P1",
+      "allowable_field_types": [
+        {
+          "sample_type": "Pooled Library",
+          "object_type": "1.7 ml Tube"
+        }
+      ]
     }
   ],
-  "on_the_fly": false,
+  "on_the_fly": null,
   "user_id": 1
 }

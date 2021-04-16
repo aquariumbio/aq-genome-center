@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -53,6 +53,8 @@ class Protocol
   include CovidSurveillanceHelper
   include KitContents
   include ConsumableDefinitions
+  
+  POOLED_PLATE = 'Sample Plate'
 
   def components_data
     []
@@ -105,7 +107,7 @@ class Protocol
 
     operations.each do |op|
       output_plate = Collection.new_collection(ObjectType.find_by_name('96-Well Plate'))
-      op.output(POOLED_PLATE).set(item: output_plate)
+      op.output('Sample Plate').set(item: output_plate)
 
       temporary_options = op.temporary[:options]
 

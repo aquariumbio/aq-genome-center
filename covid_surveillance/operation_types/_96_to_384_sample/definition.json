@@ -7,41 +7,72 @@
       "name": "Plate A",
       "part": true,
       "array": false,
-      "routing": "A"
+      "routing": "A",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Plate B",
       "part": true,
-      "array": null,
-      "routing": "B"
+      "array": false,
+      "routing": "B",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Plate C",
       "part": true,
-      "array": null,
-      "routing": "C"
+      "array": false,
+      "routing": "C",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Plate D",
       "part": true,
-      "array": null,
-      "routing": "D"
+      "array": false,
+      "routing": "D",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Options",
-      "part": null,
-      "array": null,
-      "routing": null
+      "part": false,
+      "array": false,
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "RNA Sample Plate",
       "part": true,
-      "array": null,
-      "routing": "O"
+      "array": false,
+      "routing": "O",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "384 Well Plate"
+        }
+      ]
     }
   ],
-  "on_the_fly": null,
+  "on_the_fly": false,
   "user_id": 1
 }

@@ -4,24 +4,73 @@
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "Pooled Library",
+      "name": "Final Pool",
       "part": false,
       "array": false,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Pooled Library",
+          "object_type": "1.7 ml Tube"
+        }
+      ]
     },
     {
       "name": "Options",
       "part": false,
       "array": false,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Library",
+      "name": "Stock Tube",
       "part": false,
       "array": false,
-      "routing": "Pp"
+      "routing": "Pp",
+      "allowable_field_types": [
+        {
+          "sample_type": "Pooled Library",
+          "object_type": "1.7 ml Stock Tube"
+        }
+      ]
+    },
+    {
+      "name": "10X Dil of Stock",
+      "part": false,
+      "array": false,
+      "routing": "Pp",
+      "allowable_field_types": [
+        {
+          "sample_type": "Pooled Library",
+          "object_type": "1.7 ml 10X Dil of Stock"
+        }
+      ]
+    },
+    {
+      "name": "Seq. Pool Tube",
+      "part": false,
+      "array": false,
+      "routing": "Pp",
+      "allowable_field_types": [
+        {
+          "sample_type": "Pooled Library",
+          "object_type": "1.7 ml Seq. Pool Tube"
+        }
+      ]
+    },
+    {
+      "name": "Final Dilution",
+      "part": false,
+      "array": false,
+      "routing": "Pp",
+      "allowable_field_types": [
+        {
+          "sample_type": "Pooled Library",
+          "object_type": "1.7 ml Final Dilution"
+        }
+      ]
     }
   ],
   "on_the_fly": false,

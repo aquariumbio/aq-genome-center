@@ -4,16 +4,23 @@
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "CDNA Sample Plate",
       "part": true,
       "array": false,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "384 Well Plate"
+        }
+      ]
     },
     {
       "name": "Options",
       "part": false,
       "array": false,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
@@ -21,13 +28,25 @@
       "name": "COV1",
       "part": true,
       "array": false,
-      "routing": "P1"
+      "routing": "P1",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "384 Well Plate"
+        }
+      ]
     },
     {
       "name": "COV2",
       "part": true,
-      "array": null,
-      "routing": "P2"
+      "array": false,
+      "routing": "P2",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "384 Well Plate"
+        }
+      ]
     }
   ],
   "on_the_fly": false,

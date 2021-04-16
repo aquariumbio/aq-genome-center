@@ -16,7 +16,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionActions'
 needs 'Collection Management/CollectionTransfer'
@@ -54,7 +54,8 @@ class Protocol
 
 ############ Composition Parts ###########
   ANNEAL_KIT = 'Anneal RNA Kit'
-  CDNA_PLATE = "CDNA #{POOLED_PLATE}"
+  CDNA_PLATE = 'CDNA Sample Plate'
+  POOLED_PLATE = 'RNA Sample Plate'
   def components
     [ 
        {
@@ -107,7 +108,7 @@ def default_operation_params
     dragonfly_robot_program: 'EP3_HT',
     dragonfly_robot_model: Dragonfly::MODEL,
     thermocycler_model: TestThermocycler::MODEL,
-    program_name: 'CDC_TaqPath_CG',
+    program_name: 'duke_anneal_rna',
     qpcr: true,
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
                         speed: create_qty(qty: 1600, units: RPM) },
@@ -135,21 +136,26 @@ end
       required_reactions = create_qty(qty: plate.parts.length,
                                       units: 'rxn')
 
-      composition, consumables, kit = setup_kit_composition(
-        kit_sample_name: ANNEAL_KIT,
+      composition, consumables, kits = setup_kit_composition(
+        kit_sample_names: [ANNEAL_KIT],
         num_reactions_required: required_reactions,
         components: components,
         consumables: consumable_data
       )
 
+      kit = kits.first
+
+      composition.set_adj_qty(plate.get_non_empty.length,
+                              extra: 0.005)
+
       composition.input(POOLED_PLATE).item = plate
 
-      op.output(POOLED_PLATE).make_collection
-      cdna = op.output(POOLED_PLATE).collection
+      op.output(CDNA_PLATE).make_collection
+      cdna = op.output(CDNA_PLATE).collection
       composition.input(CDNA_PLATE).item = cdna
 
       cdna_display = composition.input(CDNA_PLATE).display_name
-      plate_display = composition.input(CDNA_PLATE).display_name
+      plate_display = composition.input(POOLED_PLATE).display_name
 
       retrieve_items = reject_components(
         list_of_rejections: [POOLED_PLATE, CDNA_PLATE],
@@ -157,13 +163,18 @@ end
       )
 
       # SHOW gets the parts in the composition
-      show_retrieve_parts(
-        retrieve_items + consumables.consumables
+      display(
+        title: 'Retrieve Materials',
+        show_block: retrieve_materials(
+          retrieve_items + consumables.consumables,
+          volume_table: true,
+          adj_qty: true
+        )
       )
 
       # Form a show block array
       show_block_1a = []
-      show_block_1a.append(get_and_label_new_plate(cdna))
+      show_block_1a.append(get_and_label_new_item(composition.input(CDNA_PLATE)))
 
       show_block_1b = shake(
         items: retrieve_items.map(&:display_name),
@@ -269,7 +280,7 @@ end
       )
 
       run_qpcr(op: op,
-               plates: [cdna])
+               plates: [composition.input(CDNA_PLATE)])
     end
 
     {}

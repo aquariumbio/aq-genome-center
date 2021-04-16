@@ -5,19 +5,26 @@
   "inputs": [
     {
       "name": "Options",
-      "part": null,
-      "array": null,
-      "routing": null
+      "part": false,
+      "array": false,
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "Sample Plate",
       "part": true,
-      "array": null,
-      "routing": "P"
+      "array": false,
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "96-Well Plate"
+        }
+      ]
     }
   ],
-  "on_the_fly": null,
+  "on_the_fly": false,
   "user_id": 1
 }

@@ -7,15 +7,22 @@
       "name": "Options",
       "part": false,
       "array": false,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "Sample Plate",
       "part": true,
       "array": false,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "96-Well Plate"
+        }
+      ]
     }
   ],
   "on_the_fly": false,

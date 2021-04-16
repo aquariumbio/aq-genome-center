@@ -1,7 +1,6 @@
-
 module SampleConstants
   SPECIMEN = 'Specimen'.freeze
-  POOLED_PLATE = 'Pooled Sample Plate'.freeze
+  POOLED_PLATE = '384 Sample Plate'.freeze
   LIBRARY_POOL = 'Pooled Library'.freeze
 
   PROJECT = 'Project'.freeze

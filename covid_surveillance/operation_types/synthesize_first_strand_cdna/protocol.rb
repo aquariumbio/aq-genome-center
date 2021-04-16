@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -60,6 +60,9 @@ class Protocol
 
   MICRO_TUBES = '1.7 ml Reagent Tube'
 
+  POOLED_PLATE = 'CDNA Sample Plate'
+  MM_INPUT = 'FS CDNA Master Mix'
+
   def components
     [ 
        {
@@ -69,7 +72,7 @@ class Protocol
          suggested_ot: PLATE_384_WELL
        },
        {
-         input_name: MASTER_MIX,
+         input_name: MM_INPUT,
          qty: 8, units: MICROLITERS,
          sample_name: MASTER_MIX,
          suggested_ot: MICRO_TUBES
@@ -114,7 +117,7 @@ def default_operation_params
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
                              speed: create_qty(qty: 1000, units: TIMES_G) },
     thermocycler_model: TestThermocycler::MODEL,
-    program_name: 'CDC_TaqPath_CG',
+    program_name: 'duke_synthesize_fs',
     qpcr: true
   }
 end
@@ -129,6 +132,7 @@ def main
   )
 
   operations.each do |op|
+
     op.pass(POOLED_PLATE)
 
     set_up_test(op) if debug
@@ -139,21 +143,30 @@ def main
     required_reactions = create_qty(qty: plate.parts.length,
                                     units: 'rxn')
 
-    composition, consumables, kit = setup_kit_composition(
-      kit_sample_name: FIRST_STRAND_KIT,
+    composition, consumables, kits = setup_kit_composition(
+      kit_sample_names: [FIRST_STRAND_KIT],
       num_reactions_required: required_reactions,
       components: components,
       consumables: consumable_data
     )
 
+    kit = kits.first
+
+    composition.set_adj_qty(plate.get_non_empty.length, extra: 0.005)
+
     composition.input(POOLED_PLATE).item = plate
     plate_display = composition.input(POOLED_PLATE).display_name
 
     retrieve_list = reject_components(
-      list_of_rejections: [MASTER_MIX],
+      list_of_rejections: [MM_INPUT, POOLED_PLATE],
       components: composition.components
     )
-    show_retrieve_parts(retrieve_list + consumables.consumables)
+
+    display(
+      title: 'Retrieve Materials',
+      show_block: [retrieve_materials(retrieve_list + consumables.consumables,
+                                      adj_qty: true)]
+    )
 
     vortex_list = reject_components(
       list_of_rejections: [POOLED_PLATE],
@@ -170,7 +183,7 @@ def main
 
     show_block_1b = master_mix_handler(
       components: mm_components,
-      mm: composition.input(MASTER_MIX),
+      mm: composition.input(MM_INPUT),
       adjustment_multiplier: adj_multiplier,
       mm_container: composition.input(MICRO_TUBES)
     )
@@ -198,7 +211,7 @@ def main
       hash_to_show: use_robot(
         program: drgprogram,
         robot: drgrobot,
-        items: [composition.input(MASTER_MIX).display_name,
+        items: [composition.input(MM_INPUT).display_name,
                 plate_display]
       )
     )
@@ -206,10 +219,10 @@ def main
     association_map = one_to_one_association_map(from_collection: plate)
     kit.remove_volume(required_reactions)
     associate_transfer_item_to_collection(
-      from_item: composition.input(MASTER_MIX).item,
+      from_item: composition.input(MM_INPUT).item,
       to_collection: plate,
       association_map: association_map,
-      transfer_vol: composition.input(MASTER_MIX).volume_hash
+      transfer_vol: composition.input(MM_INPUT).volume_hash
     )
 
     kit.remove_volume(required_reactions)
@@ -243,7 +256,8 @@ def main
     )
 
     run_qpcr(op: op,
-             plates: [plate])
+             plates: [composition.input(POOLED_PLATE)])
+
   end
 
   {}
@@ -253,7 +267,7 @@ end
 def set_up_test(op)
   sample = op.input(POOLED_PLATE).part.sample
   plate = op.input(POOLED_PLATE).collection
-  samples = Array.new(plate.get_non_empty.length, sample)
+  samples = Array.new(plate.get_empty.length, sample)
   plate.add_samples(samples)
 end
 

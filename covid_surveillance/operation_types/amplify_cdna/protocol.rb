@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -54,7 +54,9 @@ class Protocol
 
   AMPLIFY_KIT = 'Amplify cDNA Kit'
 
-  MASTER_MIX_2 = 'Master Mix 2'
+  MASTER_MIX_1 = 'PCR Master Mix 1'
+  MASTER_MIX_2 = 'PCR Master Mix 2'
+  POOLED_PLATE = 'CDNA Sample Plate'
 
   def components
     [ 
@@ -64,16 +66,16 @@ class Protocol
          sample_name: 'Pooled Specimens'
        },
        {
-         input_name: MASTER_MIX,
+         input_name: MASTER_MIX_1,
          qty: 20, units: MICROLITERS,
          sample_name: MASTER_MIX,
-         suggested_ot: TEST_TUBE
+         suggested_ot: TUBE_5ML
        },
        {
         input_name: MASTER_MIX_2,
         qty: 20, units: MICROLITERS,
         sample_name: MASTER_MIX,
-        suggested_ot: TEST_TUBE
+        suggested_ot: TUBE_5ML
        },
        {
         input_name: COV1,
@@ -101,7 +103,11 @@ class Protocol
         qty: 1, units: 'Each'
       },
       {
-        consumable: CONSUMABLES[TEST_TUBE],
+        consumable: CONSUMABLES[TUBE_5ML],
+        qty: 2, units: 'Each'
+      },
+      {
+        consumable: CONSUMABLES[PLATE_384_WELL],
         qty: 2, units: 'Each'
       }
     ]
@@ -138,7 +144,7 @@ def default_operation_params
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
                              speed: create_qty(qty: 1000, units: TIMES_G) },
     thermocycler_model: TestThermocycler::MODEL,
-    program_name: 'CDC_TaqPath_CG',
+    program_name: 'duke_amplify_cdna',
     qpcr: true
   }
 end
@@ -165,12 +171,14 @@ COV2 = 'COV2'.freeze
       required_reactions = create_qty(qty: op.input(POOLED_PLATE).collection.parts.length,
                                       units: 'rxn')
 
-      composition, consumables, kit = setup_kit_composition(
-        kit_sample_name: AMPLIFY_KIT,
+      composition, consumables, kits = setup_kit_composition(
+        kit_sample_names: [AMPLIFY_KIT],
         num_reactions_required: required_reactions,
         components: components,
         consumables: consumable_data
       )
+
+      kit = kits.first
 
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
@@ -186,10 +194,20 @@ COV2 = 'COV2'.freeze
 
       retrieve_list = reject_components(
         list_of_rejections: [POOLED_PLATE, COV1, COV2,
-                             MASTER_MIX, MASTER_MIX_2],
+                             MASTER_MIX_1, MASTER_MIX_2],
         components: composition.components
       )
-      show_retrieve_parts(retrieve_list + consumables.consumables)
+
+      composition.set_adj_qty(
+        composition.input(POOLED_PLATE).item.get_non_empty.length,
+        extra: 0.005
+      )
+
+      display(
+        title: 'Retrieve the Following Materials',
+        show_block: retrieve_materials(retrieve_list + consumables.consumables,
+                                       adj_qty: true)
+      )
 
       vortex_list = reject_components(
         list_of_rejections: [POOLED_PLATE, WATER],
@@ -208,7 +226,7 @@ COV2 = 'COV2'.freeze
                          composition.input(WATER)]
 
       show_block_1b = master_mix_handler(components: mm_components_1,
-                                         mm: composition.input(MASTER_MIX),
+                                         mm: composition.input(MASTER_MIX_1),
                                          adjustment_multiplier: adj_multiplier,
                                          mm_container: composition.input(TEST_TUBE))
 
@@ -222,7 +240,9 @@ COV2 = 'COV2'.freeze
         hash_to_show: [
           show_block_1a,
           show_block_1b,
-          show_block_1c
+          show_block_1c,
+          get_and_label_new_item(composition.input(COV1)),
+          get_and_label_new_item(composition.input(COV2))
         ]
       )
 
@@ -243,7 +263,7 @@ COV2 = 'COV2'.freeze
         hash_to_show: use_robot(program: drgprogram,
                                 robot: drgrobot,
                                 items: [composition.input(COV1).display_name,
-                                        composition.input(MASTER_MIX).display_name])
+                                        composition.input(MASTER_MIX_1).display_name])
       )
 
       display_hash(
@@ -263,14 +283,15 @@ COV2 = 'COV2'.freeze
         name: op.temporary[:robot_model],
         protocol: self
       )
-  
+
       display_hash(
         title: 'Set Up and Run Robot',
         hash_to_show: use_robot(
           program: program,
           robot: robot, items: [composition.input(POOLED_PLATE),
                                 composition.input(COV1).display_name,
-                                composition.input(COV2).display_name])
+                                composition.input(COV2).display_name,
+                                'Waste Plate'])
       )
 
       association_map = one_to_one_association_map(from_collection: input_plate)
@@ -284,10 +305,10 @@ COV2 = 'COV2'.freeze
                  association_map: association_map)
 
       associate_transfer_item_to_collection(
-        from_item: composition.input(MASTER_MIX).item,
+        from_item: composition.input(MASTER_MIX_1).item,
         to_collection: plate1,
         association_map: association_map,
-        transfer_vol: composition.input(MASTER_MIX).volume_hash
+        transfer_vol: composition.input(MASTER_MIX_1).volume_hash
       )
 
       associate_transfer_collection_to_collection(
@@ -344,6 +365,12 @@ COV2 = 'COV2'.freeze
 
       run_qpcr(op: op,
                plates: [composition.input(COV1).item, composition.input(COV2).item])
+
+      display(
+        title: 'Safe Stopping Point',
+        show_block: [{ display: "<b>Safe Stopping Point</b> If you are stopping, seal #{composition.input(COV1)}, #{composition.input(COV2)} and store at -25C to -15C for up to 3 days",
+                       type: 'note' }]
+      )
     end
 
     {}
