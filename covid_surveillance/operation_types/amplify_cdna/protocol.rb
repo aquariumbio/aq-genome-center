@@ -215,7 +215,7 @@ COV2 = 'COV2'.freeze
       )
 
       show_block_1a = shake(items: vortex_list.map(&:display_name),
-                            type: Vortex::NAME)
+                            type: Inversion::NAME)
 
       adj_multiplier = plate1.get_non_empty.length
       mm_components_1 = [composition.input(IPM_HT),

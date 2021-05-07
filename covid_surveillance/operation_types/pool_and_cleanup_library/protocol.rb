@@ -161,6 +161,8 @@ end
         consumables: consumable_data
       )
 
+      composition.input(ITB).adjusted_qty(required_reactions[:qty])
+
       composition.input(POOLED_LIBRARY).item = op.output(POOLED_LIBRARY).item
       composition.input(POOLED_PLATE).item = op.input(POOLED_PLATE).collection
 
@@ -223,15 +225,11 @@ end
                 composition.input(POOLED_PLATE)]
       )
 
-      show_block_2b = pipet(volume: {qty: 35, units: MICROLITERS},
-                            source: composition.input(POOLED_PLATE),
-                            destination: 'Pooled Sample Plate')
-
       display_hash(
         title: 'Pool Wells',
         hash_to_show: [
           show_block_2a,
-          "Use a <b>P200</b> pipette to transfer <b>35 #{MICROLITERS}</b> from every well of #{composition.input(POOLED_PLATE)} to  Pooled Sample PLate"
+          "Use a <b>P200</b> pipette to transfer everything from <b>Pooled Sample Plate</b> into <b>#{INITIAL_POOL}</b>"
         ]
       )
 
@@ -250,7 +248,7 @@ end
       )
 
       show_block_3b = pipet(
-        volume: composition.input(ITB).volume_hash,
+        volume: composition.input(ITB).volume_hash(adj_qty: true),
         source: composition.input(ITB),
         destination: INITIAL_POOL
       )

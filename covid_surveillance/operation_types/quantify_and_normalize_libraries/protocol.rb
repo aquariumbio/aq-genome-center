@@ -60,7 +60,7 @@ class Protocol
 
   OUTPUT_LIBRARY = 'Stock Tube'
   DIL_10X = '10X Dil of Stock'
-  SEQ_POOL_TUBE = 'Seq. Pool Tube'
+  #SEQ_POOL_TUBE = 'Seq. Pool Tube'
   FINAL_DILUTION = 'Final Dilution'
 
 
@@ -102,12 +102,12 @@ class Protocol
       sample_name: nil,
       suggested_ot: 'Reagent Bottle'
     },
-    {
-      input_name: SEQ_POOL_TUBE,
-      qty: nil, units: nil,
-      sample_name: nil,
-      suggested_ot: 'Reagent Bottle'
-    },
+    # {
+    #   input_name: SEQ_POOL_TUBE,
+    #   qty: nil, units: nil,
+    #   sample_name: nil,
+    #   suggested_ot: 'Reagent Bottle'
+    # },
     {
       input_name: FINAL_DILUTION,
       qty: nil, units: nil,
@@ -189,7 +189,7 @@ end
       )
 
       composition.input(OUTPUT_LIBRARY).item = op.output(OUTPUT_LIBRARY).item
-      composition.input(SEQ_POOL_TUBE).item = op.output(SEQ_POOL_TUBE).item
+      #composition.input(SEQ_POOL_TUBE).item = op.output(SEQ_POOL_TUBE).item
       composition.input(DIL_10X).item = op.output(DIL_10X).item
       composition.input(FINAL_DILUTION).item = op.output(FINAL_DILUTION).item
 
@@ -201,7 +201,7 @@ end
       composition.input(POOLED_LIBRARY).item = op.input(POOLED_LIBRARY).item
 
       adj_vol_list = reject_components(
-        list_of_rejections: [POOLED_LIBRARY, MASTER_MIX, OUTPUT_LIBRARY, DIL_10X, SEQ_POOL_TUBE, FINAL_DILUTION],
+        list_of_rejections: [POOLED_LIBRARY, MASTER_MIX, OUTPUT_LIBRARY, DIL_10X, FINAL_DILUTION], #SEQ_POOL_TUBE
         components: composition.components
       )
 
@@ -275,14 +275,13 @@ end
                   consumables.input(QBIT_TUBE),
                   consumables.input(QBIT_TUBE),
                   consumables.input(QBIT_TUBE),
-                  consumables.input(QBIT_TUBE),
+                  #consumables.input(QBIT_TUBE),
                   consumables.input(QBIT_TUBE)],
         labels: [composition.input(OUTPUT_LIBRARY),
                  S1,
                  S2,
                  composition.input(DIL_10X),
-                 composition.input(SEQ_POOL_TUBE),
-                 composition.input(FINAL_DILUTION)]
+                 composition.input(FINAL_DILUTION)] #composition.input(SEQ_POOL_TUBE)
       )
 
       show_block_2b = pipet(
@@ -407,20 +406,20 @@ end
       samp_vol = (3.0 * 40.0)/dil_mol
       water_vol = 40.0 - samp_vol
 
-      show do
-        title "Create #{composition.input(SEQ_POOL_TUBE)}"
-        note pipet(volume: create_qty(qty: samp_vol, units: MICROLITERS),
-                   source: composition.input(DIL_10X),
-                   destination: composition.input(SEQ_POOL_TUBE))
-        note pipet(volume: create_qty(qty: water_vol, units: MICROLITERS),
-                   source: composition.input(WATER),
-                   destination: composition.input(SEQ_POOL_TUBE))
-      end
+      # show do
+      #   title "Create #{composition.input(SEQ_POOL_TUBE)}"
+      #   note pipet(volume: create_qty(qty: samp_vol, units: MICROLITERS),
+      #              source: composition.input(DIL_10X),
+      #              destination: composition.input(SEQ_POOL_TUBE))
+      #   note pipet(volume: create_qty(qty: water_vol, units: MICROLITERS),
+      #              source: composition.input(WATER),
+      #              destination: composition.input(SEQ_POOL_TUBE))
+      # end
 
       show do
         title "Create #{composition.input(FINAL_DILUTION)}"
-        note pipet(volume: create_qty(qty: 2, units: MICROLITERS),
-                   source: composition.input(SEQ_POOL_TUBE),
+        note pipet(volume: create_qty(qty: samp_vol, units: MICROLITERS),
+                   source: composition.input(DIL_10X),
                    destination: composition.input(FINAL_DILUTION))
         note pipet(volume: create_qty(qty: 198, units: MICROLITERS),
                    source: QBIT_JUICE,
@@ -441,8 +440,7 @@ end
                       default: 0.0)
       end
 
-      store_items([composition.input(SEQ_POOL_TUBE).item,
-                   composition.input(DIL_10X).item,
+      store_items([composition.input(DIL_10X).item, #composition.input(SEQ_POOL_TUBE).item,
                    composition.input(FINAL_DILUTION).item,
                    composition.input(OUTPUT_LIBRARY).item],
                    location: 'M20')
@@ -460,7 +458,7 @@ end
 
       seq_molarity = molarity(q_bit: final_con[:number], lib_size: lib_size)
 
-      composition.input(SEQ_POOL_TUBE).item.associate('molarity', seq_molarity)
+      composition.input(FINAL_DILUTION).item.associate('molarity', seq_molarity)
       composition.input(DIL_10X).item.associate('lib_size', lib_size)
       composition.input(DIL_10X).item.associate("concentration #{NANOGRAMS}/#{MICROLITERS}", lib_size)
     end
