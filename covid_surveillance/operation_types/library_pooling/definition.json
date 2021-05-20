@@ -1,30 +1,9 @@
 {
-  "id": 10,
   "name": "Library Pooling",
   "parent_class": "OperationType",
   "category": "Covid Surveillance",
-  "inputs": [
-    {
-      "name": "Pooled Sample Plate",
-      "part": true,
-      "array": false,
-      "routing": "P"
-    },
-    {
-      "name": "Options",
-      "part": false,
-      "array": false,
-      "routing": null
-    }
-  ],
-  "outputs": [
-    {
-      "name": "Pooled Library",
-      "part": false,
-      "array": false,
-      "routing": "P1"
-    }
-  ],
-  "on_the_fly": false,
+  "inputs": [],
+  "outputs": [],
+  "on_the_fly": null,
   "user_id": 1
 }

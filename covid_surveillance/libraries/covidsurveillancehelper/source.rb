@@ -5,7 +5,7 @@
 needs 'Container/ItemContainer'
 needs 'Container/KitHelper'
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 needs 'Standard Libs/TextDisplayHelper'
 
 module CovidSurveillanceHelper
@@ -19,25 +19,33 @@ module CovidSurveillanceHelper
   # @param num_reactions_required [Int] the number of reactions that are required
   # @param composition [Composition] the composition that is being used
   # @return Kit [KitComponent] the kit that was found
-  def setup_kit_composition(kit_sample_name:,
+  def setup_kit_composition(kit_sample_names:,
                             num_reactions_required:,
                             components:,
                             consumables:)
-    kit = find_kit(kit_sample_name, num_reactions_required)
-    all_comps = components + kit.components
+    all_comps = components
+    all_cons = consumables
+    kits = []
+    kit_sample_names.each do |kit_name|
+      kit = find_kit(kit_name, num_reactions_required)
+      all_comps += kit.components
+      all_cons +=  kit.consumables
+      kits.push(find_kit(kit_name, num_reactions_required))
+    end
 
     composition = CompositionFactory.build(
       component_data: all_comps
     )
 
-    all_cons = consumables + kit.consumables
+    kits.each do |kit|
+      set_kit_item(kit, composition)
+    end
 
-    set_kit_item(kit, composition)
     [composition,
      ConsumablesFactory.build(
        consumable_data: all_cons
      ),
-     kit]
+     kits]
   end
 
   # Rejects all things in the list
@@ -109,6 +117,8 @@ module CovidSurveillanceHelper
       { display: wait_for_instrument(instrument_name: robot.model_and_name),
         type: 'note' }
     )
+
+    show_block
   end
 
   # Creates show block following instructions for show block
@@ -116,7 +126,7 @@ module CovidSurveillanceHelper
   # @param title 'String' the string of things to show
   # @param has_to_show: 'Array<Hash>' hash to represent each line
   def display_hash(title:, hash_to_show:)
-    many_display(title: title, show_block: hash_to_show)
+    display(title: title, show_block: hash_to_show)
   end
 
   # Instructions to place plate on some magnets
@@ -140,9 +150,13 @@ module CovidSurveillanceHelper
   #
   # @param plate [Collection]
   def pipet_up_and_down(plate)
+    plate = [plate] unless plate.is_a? Array
     show_block = []
     show_block.append('Set Pipet to 35 ul')
-    show_block.append("Pipet up and down to mix all wells of plate #{plate}")
+    show_block.append('Pipet up and down to mix the following:')
+    plate.each do |p|
+      show_block.append(p.to_s)
+    end
   end
 
 end

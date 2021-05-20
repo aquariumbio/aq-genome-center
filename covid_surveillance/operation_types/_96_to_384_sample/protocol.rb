@@ -11,6 +11,7 @@ class Protocol
   PLATE_B = 'Plate B'
   PLATE_C = 'Plate C'
   PLATE_D = 'Plate D'
+  SAMPLE_PLATE = 'RNA Sample Plate'
 
   PLATE_TRANSFER_MAP = [
     {
@@ -38,7 +39,7 @@ class Protocol
   ################ Composition Parts ####################
 
   def components
-    [
+    [ 
        {
          input_name: PLATE_A,
          qty: 8.5, units: MICROLITERS,
@@ -64,7 +65,7 @@ class Protocol
         suggested_ot: PLATE96
       },
       {
-        input_name: POOLED_PLATE,
+        input_name: SAMPLE_PLATE,
         qty: nil, units: MICROLITERS,
         sample_name: 'Pooled Specimens',
         suggested_ot: PLATE
@@ -91,7 +92,7 @@ class Protocol
   #
   def default_operation_params
     {
-      tr_96_384_program: '96_to_384',
+      tr_96_384_program: '96_to_384_sample',
       tr_96_384_robot: Biomek::MODEL
     }
   end
@@ -110,7 +111,8 @@ class Protocol
         op,
         components,
         [PLATE_A, PLATE_B, PLATE_C, PLATE_D],
-        PLATE_TRANSFER_MAP
+        PLATE_TRANSFER_MAP,
+        SAMPLE_PLATE
       )
     end
 

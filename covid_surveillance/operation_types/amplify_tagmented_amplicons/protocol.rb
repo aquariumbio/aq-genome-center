@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -57,6 +57,7 @@ class Protocol
   INSTRUMENTTYPE = 'NovaSeq'
   ASSAY_NAME = 'TruSeqNanoDNA'
 
+  POOLED_PLATE = 'TAG Sample Plate'
 
   def components
     [ 
@@ -68,7 +69,7 @@ class Protocol
        },
        {
          input_name: WATER,
-         qty: 24, units: MICROLITERS,
+         qty: 6, units: MICROLITERS,
          sample_name: WATER,
          suggested_ot: 'Reagent Bottle'
       },
@@ -94,12 +95,8 @@ class Protocol
         qty: 1, units: 'Each'
       },
       {
-        consumable: CONSUMABLES[SPARE_PLATE],
+        consumable: CONSUMABLES[PLATE_384_WELL],
         qty: 1, units: 'Each'
-      },
-      {
-        consumable: CONSUMABLES[TIP_BOX_100],
-        qty: 2, units: 'Each'
       },
       {
         consumable: CONSUMABLES[TEST_TUBE],
@@ -143,7 +140,7 @@ def default_operation_params
                          temperature: create_qty(qty: 'room temperature',
                                                  units: '') },
     thermocycler_model: TestThermocycler::MODEL,
-    program_name: 'CDC_TaqPath_CG',
+    program_name: 'duke_amplify_tagmenteed_amplicons',
     qpcr: true
   }
 end
@@ -165,7 +162,7 @@ end
 
 
       composition, consumables, _kit_ = setup_kit_composition(
-        kit_sample_name: AMP_TAG_KIT,
+        kit_sample_names: [AMP_TAG_KIT],
         num_reactions_required: op.input(POOLED_PLATE).collection.parts.length,
         components: components,
         consumables: consumable_data
@@ -185,8 +182,7 @@ end
       mm_components = [composition.input(EPM_HT),
                        composition.input(WATER)]
 
-      adjust_volume(components: mm_components,
-                    multi: adj_multi)
+      composition.set_adj_qty(plate.get_non_empty.length, extra: 0.005)
 
       mm.item = make_item(sample: mm.sample,
                           object_type: mm.suggested_ot)
@@ -195,7 +191,12 @@ end
         list_of_rejections: [MASTER_MIX, POOLED_PLATE],
         components: composition.components
       )
-      show_retrieve_parts(retrieve_list + consumables.consumables)
+
+      display(
+        title: 'Retrieve Materials',
+        show_block: [retrieve_materials(retrieve_list + consumables.consumables,
+                                        adj_qty: true)]
+      )
 
       vortex_list = reject_components(
         list_of_rejections: [WATER, IDT_PLATE],
@@ -208,18 +209,17 @@ end
           type: 'note' }
       )
 
-      adj_multiplier = plate.get_non_empty.length
+
       mm_components = [composition.input(EPM_HT), composition.input(WATER)]
 
       show_block_1.append({
         display: master_mix_handler(components: mm_components,
                                     mm: composition.input(MASTER_MIX),
-                                    adjustment_multiplier: adj_multiplier,
                                     mm_container: composition.input(TEST_TUBE)),
         type: 'note'
       })
 
-      show_block_1.append({ display: place_on_magnet(plate), type: 'note' })
+      show_block_1.append({ display: place_on_magnet(composition.input(POOLED_PLATE)), type: 'note' })
 
       mosquito_robot = LiquidRobotFactory.build(
         model: temporary_options[:mosquito_robot_model],
@@ -254,17 +254,22 @@ end
                           composition.input(MASTER_MIX).display_name])
       )
 
+      use_rbt = use_robot(program: remove_supernatant_program,
+                          robot: mosquito_robot,
+                          items: [composition.input(POOLED_PLATE).display_name,
+                                  composition.input(IDT_PLATE)])
 
-      index_transfer_program = LiquidRobotProgramFactory.build(
-        program_name: temporary_options[:mosquito_transfer_index_program]
-      )
+      use_rbt[1] = { display: "Continue with the <b>#{remove_supernatant_program.program_template_name}</b> protocol", type: 'note' }
 
       show_block_1.append(
-        use_robot(program: index_transfer_program,
-                  robot: mosquito_robot,
-                  items: [composition.input(POOLED_PLATE).display_name,
-                          composition.input(IDT_PLATE)])
+        use_rbt
       )
+
+      display_hash(
+        title: 'Prep and Run Robot',
+        hash_to_show: show_block_1
+      )
+
       association_map = one_to_one_association_map(from_collection: plate)
 
       associate_transfer_item_to_collection(
@@ -319,14 +324,9 @@ end
 
       show_block_2.append(
         {
-          display: pipet_up_and_down(composition.input(POOLED_PLATE).display_name),
+          display: 'Ensure beads are resuspend',
           type: 'note'
         }
-      )
-
-      display_hash(
-        title: 'Prep and Run Robot',
-        hash_to_show: show_block_1
       )
 
       display_hash(
@@ -398,7 +398,12 @@ end
     end
     output_csv = CSV.new(csv_arrays.to_csv)
     inspect output_csv if debug
-    op.associate(INDEX_CSV_KEY, output_csv)
+    up = Upload.new
+    up.upload = StringIO.new(csv_arrays.to_s)
+    up.name = RNA_EXTRACTION_DATA + op.id.to_s
+    up.save
+
+    op.associate(RNA_EXTRACTION_DATA, up)
   end
 
   def transfer_adapter_index(from_plate:, to_plate:)

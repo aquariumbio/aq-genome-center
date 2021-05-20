@@ -7,39 +7,70 @@
       "name": "Plate A",
       "part": true,
       "array": false,
-      "routing": "A"
+      "routing": "A",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Plate B",
       "part": true,
       "array": false,
-      "routing": "B"
+      "routing": "B",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Plate C",
       "part": true,
       "array": false,
-      "routing": "C"
+      "routing": "C",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Plate D",
       "part": true,
       "array": false,
-      "routing": "D"
+      "routing": "D",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "96-Well Plate"
+        }
+      ]
     },
     {
       "name": "Options",
       "part": false,
       "array": false,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "384 Index Plate",
       "part": true,
       "array": false,
-      "routing": "O"
+      "routing": "O",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "384 Well Plate"
+        }
+      ]
     }
   ],
   "on_the_fly": false,

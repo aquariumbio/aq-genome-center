@@ -26,29 +26,16 @@ module PoolSamplesHelper
   # @param max_specimens [FixNum] the max number of specimens per operation
   # @return void
   def validate(operations:, max_specimens:)
-    cts = []
     operations.each do |op|
-      n_specimens = op.input_array(SPECIMEN).length
-      cts.append(n_specimens)
-      next unless n_specimens > max_specimens
+      next unless op.input_array(SPECIMEN).length > max_specimens
 
-      msg = "operation has #{n_specimens} specimens when only #{max_specimens} are allowed"
-      op.error(:input_error, msg)
+      msg = 'This operation failed validation because it had too many inputs.'
+      op.error(:max_specimens_exceeded, msg)
       show do
-        title 'Job failed validation'
-        note "Operation #{op.id} failed validation because it has too many inputs."
+        title "Operation #{op.id} failed validation"
+        note msg
         warning 'This job will terminate early.'
       end
-    end
-
-    return if cts.uniq.length == 1
-
-    msg = "operations have unequal numbers of inputs #{cts}"
-    operations.each { |op| op.error(:input_error, msg) }
-    show do
-      title 'Job failed validation'
-      note 'This protocol requires all the opertations to have the same number of inputs.'
-      warning 'This job will terminate early.'
     end
   end
 
@@ -94,24 +81,6 @@ module PoolSamplesHelper
     )
   end
 
-  # Creates a new MicrotiterPlate to wrap the provided collection and adds
-  #   the provided pooling groups to the collections provenance map
-  #
-  # @param collection [Collection]
-  # @param pooling_groups [Array<Item>]
-  # @return [MicrotiterPlate]
-  def add_pools_by_well(collection:, pooling_groups:)
-    microtiter_plate = MicrotiterPlateFactory.build(
-      collection: collection,
-      group_size: 1,
-      method: nil
-    )
-    add_provenance_by_well(
-      microtiter_plate: microtiter_plate,
-      pooling_groups: pooling_groups
-    )
-  end
-
   private
 
   # Adds the provided pooling groups to the provenance map of
@@ -130,39 +99,12 @@ module PoolSamplesHelper
     microtiter_plate
   end
 
-  # Adds the provided pooling groups to the provenance map of
-  #   the MicrotiterPlate
-  #
-  # @param microtiter_plate [MicrotiterPlate]
-  # @param pooling_groups [Array<Item>]
-  # @return [MicrotiterPlate]
-  def add_provenance_by_well(microtiter_plate:, pooling_groups:)
-    pooling_groups.each do |alphanum, pooling_group|
-      microtiter_plate.associate_provenance(
-        index: alphanum_to_rc(alphanum),
-        key: :specimens,
-        data: pooling_group.map { |item| hash_data(item) }
-      )
-    end
-    microtiter_plate
-  end
-
   # Creates a provenance hash for the provided item
   #
   # @param item [Item]
   # @return [Hash]
   def hash_data(item)
-    properties = item.sample.properties
-    default = 'not found'
-    specimen_barcode = properties.fetch('Specimen Barcode', default)
-    rack_barcode = properties.fetch('Ingest Rack Barcode', default)
-    rack_location = properties.fetch('Ingest Rack Location', default)
-    {
-      item: item,
-      specimen_barcode: specimen_barcode,
-      rack_barcode: rack_barcode,
-      rack_location: rack_location
-    }
+    { item: item, barcode: item.sample.properties.fetch('Barcode ID') }
   end
 
   def inspect_first_three(collection)

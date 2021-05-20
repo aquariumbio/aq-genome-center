@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -49,11 +49,15 @@ class Protocol
 
   COV1 = 'COV1'.freeze
   COV2 = 'COV2'.freeze
+  POOLED_PLATE = 'TAG Sample Plate'
+
 #========== Composition Definitions ==========#
   TAGMENT_KIT = 'Tagment PCR Amplicons Kit'
 
   EBLTS_HT = 'Enrichment BLT HT'
   TB1_HT = 'Tagmentation Buffer 1 HT'
+
+  MM_INPUT = 'Tag Master Mix'
 
   def components
     [
@@ -76,14 +80,14 @@ class Protocol
         suggested_ot: PLATE_384_WELL
       },
       {
-        input_name: MASTER_MIX,
-        qty: 30, units: MICROLITERS,
+        input_name: MM_INPUT,
+        qty: 7.4, units: MICROLITERS,
         sample_name: MASTER_MIX,
         suggested_ot: TEST_TUBE
       },
       {
         input_name: WATER,
-        qty: 20, units: MICROLITERS,
+        qty: 5, units: MICROLITERS,
         sample_name: WATER,
         suggested_ot: 'Reagent Bottle'
       }
@@ -133,7 +137,7 @@ def default_operation_params
     centrifuge_parameters: { time: create_qty(qty: 1, units: MINUTES),
                             speed: create_qty(qty: 1000, units: TIMES_G) },
     thermocycler_model: TestThermocycler::MODEL,
-    program_name: 'CDC_TaqPath_CG',
+    program_name: 'duke_tagment_pcr_amplicons',
     qpcr: true
   }
 end
@@ -157,12 +161,14 @@ end
       required_reactions = create_qty(qty: op.input(COV1).collection.parts.length,
                                       units: 'rxn')
 
-      composition, consumables, kit = setup_kit_composition(
-        kit_sample_name: TAGMENT_KIT,
+      composition, consumables, kits = setup_kit_composition(
+        kit_sample_names: [TAGMENT_KIT],
         num_reactions_required: required_reactions,
         components: components,
         consumables: consumable_data
       )
+
+      kit = kits.first
 
       composition.input(WATER).item = find_random_item(
         sample: composition.input(WATER).sample,
@@ -178,15 +184,18 @@ end
       out_display = composition.input(POOLED_PLATE).display_name
 
       retrieve_list = reject_components(
-        list_of_rejections: [POOLED_PLATE, MASTER_MIX, COV1, COV2],
+        list_of_rejections: [POOLED_PLATE, MM_INPUT, COV1, COV2],
         components: composition.components
       )
 
+      composition.set_adj_qty(composition.input(COV1).item.get_non_empty.length,
+                              extra: 0.005)
 
-      show_retrieve_parts(retrieve_list + consumables.consumables)
+
+      show_retrieve_parts(retrieve_list + consumables.consumables, adj_qty: true)
 
       vortex_list = reject_components(
-        list_of_rejections: [WATER, COV1, COV2, MASTER_MIX, POOLED_PLATE],
+        list_of_rejections: [WATER, COV1, COV2, MM_INPUT, POOLED_PLATE],
         components: retrieve_list
       )
 
@@ -199,22 +208,21 @@ end
                        composition.input(WATER)]
 
       show_block_1b = master_mix_handler(components: mm_components,
-                                         mm: composition.input(MASTER_MIX),
+                                         mm: composition.input(MM_INPUT),
                                          adjustment_multiplier: adj_multiplier,
                                          mm_container: consumables.input(TEST_TUBE))
 
-      show_block_1b += label_items(
-        objects: [consumables.input(MICRO_TUBE),
-                  consumables.input(PLATE_384_WELL)],
-        labels: [composition.input(MASTER_MIX).item,
-                 out_display]
+      show_block_1c = label_items(
+        objects: [consumables.input(PLATE_384_WELL)],
+        labels: [out_display]
       )
 
       display_hash(
         title: 'Prepare for Procedure',
         hash_to_show: [
           show_block_1a,
-          show_block_1b
+          show_block_1b,
+          show_block_1c
         ]
       )
 
@@ -232,7 +240,7 @@ end
         title: 'Set Up and Run Robot',
         hash_to_show: use_robot(program: drgprogram,
                                 robot: drgrobot,
-                                items: [composition.input(MASTER_MIX).display_name,
+                                items: [composition.input(MM_INPUT).display_name,
                                         out_display])
       )
 
@@ -276,7 +284,7 @@ end
         transfer_vol: composition.input(COV2).volume_hash
       )
 
-      mm = composition.input(MASTER_MIX)
+      mm = composition.input(MM_INPUT)
       associate_transfer_item_to_collection(
         from_item: mm.item,
         to_collection: output_plate,
@@ -321,7 +329,7 @@ end
       )
 
       run_qpcr(op: op,
-               plates: [output_plate])
+               plates: [composition.input(POOLED_PLATE)])
     end
 
     {}

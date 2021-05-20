@@ -15,7 +15,7 @@ needs 'Covid Surveillance/CovidSurveillanceHelper'
 needs 'Liquid Robot Helper/RobotHelper'
 
 needs 'Composition Libs/Composition'
-needs 'CompositionLibs/CompositionHelper'
+needs 'Composition Libs/CompositionHelper'
 
 needs 'Collection Management/CollectionTransfer'
 needs 'Collection Management/CollectionActions'
@@ -49,6 +49,7 @@ class Protocol
 
 #========== Composition Definitions ==========#
   POST_TAG_KIT = 'Post Tagmentation Clean Up Kit'
+  POOLED_PLATE = 'TAG Sample Plate'
 
 
   def components
@@ -93,8 +94,8 @@ def default_operation_params
   {
     mosquito_robot_program: 'Post Tagmentation Clean Up',
     mosquito_robot_model: Mosquito::MODEL,
-    dragonfly_robot_program: 'TWB_HT',
-    dragonfly_robot_program2: 'ST2_HT',
+    dragonfly_robot_program2: 'TWB_HT',
+    dragonfly_robot_program: 'ST2_HT',
     dragonfly_robot_model: Dragonfly::MODEL,
     storage_location: 'M80',
     shaker_parameters: { time: create_qty(qty: 1, units: MINUTES),
@@ -129,7 +130,7 @@ end
       temporary_options = op.temporary[:options]
 
       composition, consumables, _kit_ = setup_kit_composition(
-        kit_sample_name: POST_TAG_KIT,
+        kit_sample_names: [POST_TAG_KIT],
         num_reactions_required: required_reactions,
         components: components,
         consumables: consumable_data
@@ -139,7 +140,15 @@ end
       plate = composition.input(POOLED_PLATE).item
       plate_display = composition.input(POOLED_PLATE).display_name
 
-      show_retrieve_parts(composition.components + consumables.consumables)
+      composition.set_adj_qty(composition.input(POOLED_PLATE).item.get_non_empty.length,
+                              extra: 0.005)
+
+      retrieve_list = reject_components(
+        list_of_rejections: [POOLED_PLATE],
+        components: composition.components
+      )
+
+      show_retrieve_parts(retrieve_list + consumables.consumables)
 
       vortex_list = reject_components(
         list_of_rejections: [POOLED_PLATE],
@@ -210,6 +219,15 @@ end
                           composition.input(ST2_HT).display_name])
       )
 
+      show_block_1.append(
+        {
+          display: seal_plate(
+            [plate_display], seal: consumables.input(AREA_SEAL)
+          ),
+          type: 'note'
+        }
+      )
+
       associate_transfer_item_to_collection(
         from_item: composition.input(ST2_HT).item,
         to_collection: plate,
@@ -219,40 +237,59 @@ end
 
       show_block_2 = []
 
+      # show_block_2.append(
+      #   {
+      #     display: seal_plate(
+      #       [plate_display], seal: consumables.input(AREA_SEAL)
+      #     ),
+      #     type: 'note'
+      #   }
+      # )
+
+      # show_block_2.append(
+      #   {
+      #     display: shake(items: vortex_list.map(&:display_name),
+      #                    type: Vortex::NAME),
+      #     type: 'note'
+      #   }
+      # )
+
+      # show_block_2.append(
+      #   {
+      #     display: spin_down(
+      #       items: [plate_display],
+      #       speed: temporary_options[:centrifuge_parameters][:speed],
+      #       time: temporary_options[:centrifuge_parameters][:time]
+      #     ),
+      #     type: 'note'
+      #   }
+      # )
+
       show_block_2.append(
         {
-          display: seal_plate(
-            [plate_display], seal: consumables.input(AREA_SEAL)
-          ),
-          type: 'note'
-        }
-      )
-
-      show_block_1.append(
-        {
-          display: shake(items: vortex_list.map(&:display_name),
+          display: shake(items: [composition.input(POOLED_PLATE)],
+                         speed: temporary_options[:shaker_parameters][:speed],
+                         time: temporary_options[:shaker_parameters][:time],
                          type: Vortex::NAME),
           type: 'note'
         }
       )
 
       show_block_2.append(
-        {
-          display: show_incubate_items(
+        show_incubate_items(
             items: [plate_display],
             time: temporary_options[:incubation_params][:time],
             temperature: temporary_options[:incubation_params][:temperature]
-          ),
-          type: 'note'
-        }
+          )
       )
 
       show_block_2.append(
         { 
           display: spin_down(
-            items: [plate_display],
+            items: [composition.input(POOLED_PLATE)],
             speed: temporary_options[:centrifuge_parameters][:speed],
-            time: temporary_options[:centrifuge_parameters][:time]
+            time: temporary_options[:centrifuge_parameters][:time],
+            type: Large::NAME
           ),
           type: 'note'
         }
@@ -297,7 +334,7 @@ end
 
       show_block_3.append(
         {
-          display: shake(items: vortex_list.map(&:display_name),
+          display: shake(items: [composition.input(POOLED_PLATE).display_name],
                          type: Vortex::NAME),
           type: 'note'
         }
@@ -317,12 +354,12 @@ end
       show_block_3.append({ display: place_on_magnet(plate_display),
                             type: 'note' })
 
-      show_block_2.append( 
+      show_block_3.append(
         use_robot(
           program: program,
           robot: robot,
           items: [plate_display]
-        )
+        ).insert(1, { display: "Keep #{plate_display} on Magnet", type: 'warning' })
       )
 
       show_block_4 = []
@@ -352,7 +389,7 @@ end
 
       show_block_4.append(
         {
-          display: shake(items: vortex_list.map(&:display_name),
+          display: shake(items: [composition.input(POOLED_PLATE).display_name],
                          type: Vortex::NAME),
           type: 'note'
         }
@@ -384,8 +421,6 @@ end
                    hash_to_show: show_block_3)
       display_hash(title: 'Perform the following steps',
                    hash_to_show: show_block_4)
-      run_qpcr(op: op,
-               plates: [plate])
     end
 
     {}

@@ -4,30 +4,49 @@
   "category": "Covid Surveillance",
   "inputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "TAG Sample Plate",
       "part": true,
       "array": false,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "384 Well Plate"
+        }
+      ]
     },
     {
       "name": "Options",
       "part": false,
       "array": false,
-      "routing": null
+      "routing": null,
+      "allowable_field_types": []
     },
     {
       "name": "Index Adapter",
       "part": true,
-      "array": null,
-      "routing": "IA"
+      "array": false,
+      "routing": "IA",
+      "allowable_field_types": [
+        {
+          "sample_type": "Index Adapter Sample",
+          "object_type": "384 Well Plate"
+        }
+      ]
     }
   ],
   "outputs": [
     {
-      "name": "Pooled Sample Plate",
+      "name": "TAG Sample Plate",
       "part": true,
       "array": false,
-      "routing": "P"
+      "routing": "P",
+      "allowable_field_types": [
+        {
+          "sample_type": "Specimen",
+          "object_type": "384 Well Plate"
+        }
+      ]
     }
   ],
   "on_the_fly": false,
